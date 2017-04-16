@@ -1,0 +1,1 @@
+UPD 2017-04-16_13:58:00 7799 FHEM/31_TradfriDevice.pm
