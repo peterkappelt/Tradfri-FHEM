@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @date 17.4.2017 15:02
+# @version 1.2
 
 package TradfriLib;
 use strict;
@@ -8,7 +8,8 @@ use JSON;
 use Data::Dumper;
 
 use constant{
-		PATH_ROOT =>    '15001',
+	PATH_DEVICE_ROOT =>		'15001',
+	PATH_GROUP_ROOT =>		'15004',
 };
 
 sub dbg{
@@ -43,7 +44,7 @@ sub coapCommand{
 
 	my $return = `$coapClientCMD`;
 
-	print $coapClientCMD;
+	#print $coapClientCMD;
 
 	#dbg($return);
 	#dbg("\r\n");
@@ -64,14 +65,19 @@ sub coapCommand{
 
 #this returns the devices, which are couples to the hub
 #it is an array, with one id per element
+#first arg: gateway address
+#second arg: gateway secret
 sub getDevices{
-	return coapCommand($_[0], $_[1], 'GET', PATH_ROOT, {});
+	return coapCommand($_[0], $_[1], 'GET', PATH_DEVICE_ROOT, {});
 }
 
 #get the JSON hash of a device's path
-#takes one argument: the device address
+#takes three arguments:
+#first arg: gateway address
+#second arg: gateway secret
+#third arg: device address
 sub getDeviceInfo{
-	return coapCommand($_[0], $_[1], 'GET', PATH_ROOT . "/" . $_[2], {});
+	return coapCommand($_[0], $_[1], 'GET', PATH_DEVICE_ROOT . "/" . $_[2], {});
 }
 
 #get the device typpe
@@ -86,32 +92,79 @@ sub getDeviceManufacturer{
 	return $_[0]->{3}{0};
 }
 
-# The output of the path ROOT_PATH/LAMP_ADDRESS looks like follows.
+#get the user defined name of the device
+#you must pass the return code of getDeviceInfo as the first argument
+sub getDeviceName{
+	return $_[0]->{9001};
+}
+
+#this returns the groups, which are configured on the hub
+#it is an array, with one group id per element
+#first arg: gateway address
+#second arg: gateway secret
+sub getGroups{
+	return coapCommand($_[0], $_[1], 'GET', PATH_GROUP_ROOT, {});
+}
+
+#get the JSON hash of a group's path
+#takes three arguments:
+#first arg: gateway address
+#second arg: gateway secret
+#third arg: group address
+sub getGroupInfo{
+	return coapCommand($_[0], $_[1], 'GET', PATH_GROUP_ROOT . "/" . $_[2], {});
+}
+
+#get the user defined name of the group
+#you must pass the return code of getDeviceInfo as the first argument
+sub getGroupName{
+	return $_[0]->{9001};
+}
+
+# The output of the path PATH_GROUP_ROOT/GROUP_ADDRESS looks like follows:
+#$VAR1 = {
+#          '9003' => 193768,						-> id
+#          '9018' => {								-> "HS_ACCESSORY_LINK"
+#                      '15002' => {
+#                                   '9003' => [
+#                                               65536,
+#                                               65537,			-> sub-devices, contained in group
+#                                               65538
+#                                             ]
+#                                 }
+#                    },
+#          '5851' => 0,								-> dimming value
+#          '9039' => 199947,						
+#          '5850' => 1,								-> on/off
+#          '9002' => 1492280898,					-> created at
+#          '9001' => 'TRADFRI group'				-> name
+#        };
+
+# The output of the path PATH_DEVICE_ROOT/LAMP_ADDRESS looks like follows.
 # We can just write single values to change the attributes
 
 # $VAR1 = {
-		  # '9020' => 1492322690,
-		  # '9003' => 65537,
-		  # '9054' => 0,
+		  # '9020' => 1492322690,			-> last seen
+		  # '9003' => 65537,				-> id
+		  # '9054' => 0,					-> ota update state?
 		  # '3311' => [
 					  # {
-						# '9003' => 0,
-						# '5850' => 0,
-						# '5851' => 91
+						# '9003' => 0,		-> id?
+						# '5850' => 0,		-> on/off
+						# '5851' => 91		-> brightness (dimmer)
 					  # }
 					# ],
-		  # '9019' => 1,
+		  # '9019' => 1,								-> reachable state
 		  # '3' => {
-				   # '0' => 'IKEA of Sweden',
+				   # '0' => 'IKEA of Sweden',			-> manufacturer	
 				   # '2' => '',
- 
-				  # '3' => '1.1.1.0-5.7.2.0',
+				  # '3' => '1.1.1.0-5.7.2.0',			-> version
 				   # '6' => 1,
-				   # '1' => 'TRADFRI bulb E27 opal 1000lm'
+				   # '1' => 'TRADFRI bulb E27 opal 1000lm'		-> product name
 				 # },
-		  # '9001' => 'Fenster Links',
-		  # '9002' => 1492280964,
-		  # '5750' => 2
+		  # '9001' => 'Fenster Links',			-> user defined name
+		  # '9002' => 1492280964,				-> created at
+		  # '5750' => 2							-> application type?!
 		# };
 
 
@@ -131,7 +184,7 @@ sub lampSetOnOff{
 				]
 		};
 
-		coapCommand($_[0], $_[1], 'PUT', "15001/$lampAddress", $command);
+		coapCommand($_[0], $_[1], 'PUT', PATH_DEVICE_ROOT . "/$lampAddress", $command);
 }
 
 #set the dimming brightness of a lamp
@@ -156,7 +209,43 @@ sub lampSetBrightness{
 				]
 		};
 
-		coapCommand($_[0], $_[1], 'PUT', "15001/$lampAddress", $command);
+		coapCommand($_[0], $_[1], 'PUT', PATH_DEVICE_ROOT . "/$lampAddress", $command);
+}
+
+#turn all devices in a group on or off
+#this requires two arguments: the group address and the on/off state (as 0 or 1)
+sub groupSetOnOff{
+		my $groupAddress = $_[2];
+		my $onOffState = $_[3];
+
+		my $jsonState = $onOffState ? 1:0;
+
+		my $command = {
+			'5850' => $jsonState
+		};
+
+		coapCommand($_[0], $_[1], 'PUT', PATH_GROUP_ROOT . "/$groupAddress", $command);
+}
+
+#set the dimming brightness of all devices in agroup
+#this requires two arguments: the group address and the dimming value, between 0 and 254 (including these values)
+sub groupSetBrightness{
+		my $groupAddress = $_[2];
+		my $brightness = $_[3];
+
+		if($brightness > 254){
+				$brightness = 254;
+		}
+		if($brightness < 0){
+				$brightness = 0;
+		}
+
+		#caution: we need an hash reference here, so it must be defined with $
+		my $command = {
+			'5851' => $brightness
+		};
+
+		coapCommand($_[0], $_[1], 'PUT', PATH_GROUP_ROOT . "/$groupAddress", $command);
 }
 
 1;

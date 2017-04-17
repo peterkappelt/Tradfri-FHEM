@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @date 17.4.2017 15:02
+# @version 1.2
 
 package main;
 use strict;
@@ -12,7 +12,8 @@ my %TradfriGateway_sets = (
 );
 
 my %TradfriGateway_gets = (
-	"deviceList"	=> ' ',
+	'deviceList'	=> ' ',
+	'groupList'		=> ' ',
 );
 
 sub TradfriGateway_Initialize($) {
@@ -25,10 +26,11 @@ sub TradfriGateway_Initialize($) {
 	$hash->{AttrFn}     = 'TradfriGateway_Attr';
 	$hash->{ReadFn}     = 'TradfriGateway_Read';
 
-	$hash->{Clients}	= "TradfriDevice";
-	$hash->{MatchList} = { "1:TradfriDevice" => ".*" };
-
-	#$hash->{AttrList} = "formal:yes,no " . $readingFnAttributes;
+	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
+	$hash->{MatchList} = {
+			"1:TradfriDevice" => "D.*" ,
+			"2:TradfriGroup" => "G.*" ,
+			};
 }
 
 sub TradfriGateway_Define($$) {
@@ -75,7 +77,37 @@ sub TradfriGateway_Get($@) {
 		my $returnUserString = "";
 
 		for(my $i = 0; $i < scalar(@{$deviceIDList}); $i++){
-			$returnUserString .= "- " . ${$deviceIDList}[$i] . "\n";
+			my $deviceInfo = TradfriLib::getDeviceInfo($hash->{gatewayAddress}, $hash->{gatewaySecret}, ${$deviceIDList}[$i]);
+			$returnUserString .= "- " . 
+				${$deviceIDList}[$i] . 
+				": " . 
+				TradfriLib::getDeviceManufacturer($deviceInfo) .
+				" " .
+				TradfriLib::getDeviceType($deviceInfo) .
+				" (" .
+				TradfriLib::getDeviceName($deviceInfo) .
+				")" .
+				"\n";
+		}
+
+		return $returnUserString;
+	}elsif($opt eq 'groupList'){
+		my $groupIDList = TradfriLib::getGroups($hash->{gatewayAddress}, $hash->{gatewaySecret});
+
+		if($groupIDList ~~ undef){
+			return "Error while fetching groups!";
+		}
+
+		my $returnUserString = "";
+
+		for(my $i = 0; $i < scalar(@{$groupIDList}); $i++){
+			my $groupInfo = TradfriLib::getGroupInfo($hash->{gatewayAddress}, $hash->{gatewaySecret}, ${$groupIDList}[$i]);
+
+			$returnUserString .= "- " .
+			${$groupIDList}[$i] .
+			": " .
+			TradfriLib::getGroupName($groupInfo);
+
 		}
 
 		return $returnUserString;
