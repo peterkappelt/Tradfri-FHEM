@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.2
+# @version 1.3
 
 package main;
 use strict;
@@ -73,6 +73,9 @@ sub TradfriDevice_Get($@) {
 	}
 	
 	if($opt eq 'deviceInfo'){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
 		if($jsonDeviceInfo ~~ undef){
@@ -107,12 +110,21 @@ sub TradfriDevice_Set($@) {
 	$hash->{STATE} = $TradfriDevice_sets{$opt} = $value;
 
 	if($opt eq "on"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		TradfriLib::lampSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, 1);
 		readingsSingleUpdate($hash, 'state', 'on', 1);
 	}elsif($opt eq "off"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		TradfriLib::lampSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, 0);
 		readingsSingleUpdate($hash, 'state', 'off', 1);
 	}elsif($opt eq "dimvalue"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 		TradfriLib::lampSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, int($value));
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);

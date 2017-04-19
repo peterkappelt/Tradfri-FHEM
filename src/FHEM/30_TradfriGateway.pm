@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.2
+# @version 1.3
 
 package main;
 use strict;
@@ -14,7 +14,22 @@ my %TradfriGateway_sets = (
 my %TradfriGateway_gets = (
 	'deviceList'	=> ' ',
 	'groupList'		=> ' ',
+	'coapClientVersion'		=> ' ',
 );
+
+sub checkCoapClient{
+	#check, if coap-client software exists. Set the Reading 'coapClientVersion' to the first line of the programm call's output
+	my $coapClientReturnMessage = `coap-client 2>&1`;
+	if($coapClientReturnMessage eq ''){
+		#empty return -> error
+		$_[0]->{canConnect} = 0;
+		return "UNKNOWN";
+	}else{
+		readingsSingleUpdate($_[0], 'coapClientVersion', (split(/\n/, $coapClientReturnMessage))[0], 0);
+		$_[0]->{canConnect} = 1;
+		return (split(/\n/, $coapClientReturnMessage))[0];
+	}
+}
 
 sub TradfriGateway_Initialize($) {
 	my ($hash) = @_;
@@ -45,6 +60,8 @@ sub TradfriGateway_Define($$) {
 
 	$hash->{gatewayAddress} = $param[2];
 	$hash->{gatewaySecret} = $param[3];
+
+	checkCoapClient($hash);
 
 	return undef;
 }
@@ -111,6 +128,8 @@ sub TradfriGateway_Get($@) {
 		}
 
 		return $returnUserString;
+	}elsif($opt eq 'coapClientVersion'){
+		return checkCoapClient($hash);
 	}
 
 	return $TradfriGateway_gets{$opt};

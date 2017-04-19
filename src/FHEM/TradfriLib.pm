@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.2
+# @version 1.3
 
 package TradfriLib;
 use strict;
@@ -11,10 +11,6 @@ use constant{
 	PATH_DEVICE_ROOT =>		'15001',
 	PATH_GROUP_ROOT =>		'15004',
 };
-
-sub dbg{
-	print("$_[0]\r\n");
-}
 
 sub coapCommand{
 	my $gwAddress = $_[0];
@@ -34,7 +30,7 @@ sub coapCommand{
 		return undef;
 	}
 
-	my $coapClientCMD = "coap-client -u Client_identity -k $gwSecret -v 1 -m $method coaps://$gwAddress:5684/$path";
+	my $coapClientCMD = "timeout 5s coap-client -u Client_identity -k $gwSecret -v 1 -m $method coaps://$gwAddress:5684/$path";
 
 	if(%data){
 		$coapClientCMD .= ' -f tmp';

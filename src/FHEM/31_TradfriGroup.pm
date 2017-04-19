@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.2
+# @version 1.3
 
 package main;
 use strict;
@@ -71,8 +71,12 @@ sub TradfriGroup_Get($@) {
 	}
 	
 	if($opt eq 'groupInfo'){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		
+
 		if($jsonGroupInfo ~~ undef){
 			return "Error while fetching group info!";
 		}
@@ -102,12 +106,21 @@ sub TradfriGroup_Set($@) {
 	$hash->{STATE} = $TradfriGroup_sets{$opt} = $value;
 
 	if($opt eq "on"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		TradfriLib::groupSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, 1);
 		readingsSingleUpdate($hash, 'state', 'on', 1);
 	}elsif($opt eq "off"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		TradfriLib::groupSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, 0);
 		readingsSingleUpdate($hash, 'state', 'off', 1);
 	}elsif($opt eq "dimvalue"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
 		return '"set TradfriGroup dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 		TradfriLib::groupSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, int($value));
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);

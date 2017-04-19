@@ -90,10 +90,9 @@ You need to do as follows in order to control a bulb:
    `set Group1 dimvalue x` will set all brightnesses of the group to a certain value, where x is between 0 and 254 
 
 ## What to do, if my FHEM isn't responding anymore?
-Sorry, the module isn't really stable yet.
-Probably, the process coap-client has an issue. You can find out the process id on the command line: `ps -aux | grep coap-client`. Once you got the process id, you can kill it `sudo kill process-id`   
-  
-I'd appreciate a short crash report, with the relevant part of the FHEM log file and the output of `ps -aux | grep coap-client` (before killing this process)
+
+Actually, this shouldn't happen anymore. Wait 5 seconds, and all processes, that are related to this Trådfri module, should kill themselves (if there is a configuration error, that isn't yet handled by this module).    
+If you managed to kill this module, fell free to contact me (with your log, you configuration and a description, of what you did to make FHEM unresponsible).
 
 ## Credits
 I'd like to thank the guys from the home-assistant.io community, they already did some reverse-engineering of the protocol, which helped me implementing the protocol.   
