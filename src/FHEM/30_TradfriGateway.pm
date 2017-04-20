@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.3
+# @version 1.4
 
 package main;
 use strict;
@@ -121,9 +121,9 @@ sub TradfriGateway_Get($@) {
 			my $groupInfo = TradfriLib::getGroupInfo($hash->{gatewayAddress}, $hash->{gatewaySecret}, ${$groupIDList}[$i]);
 
 			$returnUserString .= "- " .
-			${$groupIDList}[$i] .
-			": " .
-			TradfriLib::getGroupName($groupInfo);
+				${$groupIDList}[$i] .
+				": " .
+				TradfriLib::getGroupName($groupInfo);
 
 		}
 
@@ -164,7 +164,7 @@ sub TradfriGateway_Attr(@) {
 		#		return $err;
 		#	}
 		#} else {
-			return "Unknown attr $attr_name";
+		#	return "Unknown attr $attr_name";
 		#}
 	}
 	return undef;

@@ -46,12 +46,12 @@ You can:
 * Get the IDs of all groups that are configured in the gateway
 * Turn a group on or off
 * Set the brightness of a group
+* Get information about groups (created at, name, member devices, ...) -> currently can't read brightness and state
 ## What this module can not do
 These points will be implemented later:
 * Set the color temperature of a bulb that is able to do that
 * Pair new devices
 * Read information from the bulb, like the current brightness, and react to it
-* Get information about groups, like connected devices
 
 ## Getting started
 You need to do as follows in order to control a bulb:
@@ -88,6 +88,7 @@ You need to do as follows in order to control a bulb:
    `set Group1 on` will turn all devices in the group on  
    `set Group1 off` will turn all devices in the group off
    `set Group1 dimvalue x` will set all brightnesses of the group to a certain value, where x is between 0 and 254 
+* You can get additional information about this command in the automatically generated FHEM HTML commandreference, under TradfriGroup
 
 ## What to do, if my FHEM isn't responding anymore?
 

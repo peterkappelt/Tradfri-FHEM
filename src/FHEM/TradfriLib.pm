@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.3
+# @version 1.4
 
 package TradfriLib;
 use strict;
@@ -112,7 +112,38 @@ sub getGroupInfo{
 }
 
 #get the user defined name of the group
-#you must pass the return code of getDeviceInfo as the first argument
+#you must pass the return code of getGroupInfo as the first argument
+sub getGroupName{
+	return $_[0]->{9001};
+}
+
+#get the device IDs of all group members
+#you must pass the return code of getGroupInfo as the first argument
+#it returns an array reference containing all group IDs
+sub getGroupMembers{
+	return $_[0]->{9018}{15002}{9003};
+}
+
+#get the current dimming value of a group
+#you must pass the return code of getGroupInfo as the first argument
+sub getGroupBrightness{
+	return $_[0]->{5851};
+}
+
+#get the current on/off state of a group
+#you must pass the return code of getGroupInfo as the first argument
+sub getGroupOnOff{
+	return $_[0]->{5850};
+}
+
+#get the timestamp, when the group was created
+#you must pass the return code of getGroupInfo as the first argument
+sub getGroupCreatedAt{
+	return $_[0]->{9002};
+}
+
+#get the name of a group
+#you must pass the return code of getGroupInfo as the first argument
 sub getGroupName{
 	return $_[0]->{9001};
 }
