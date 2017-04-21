@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.4
+# @version 1.5
 
 package main;
 use strict;
@@ -320,7 +320,7 @@ sub TradfriGroup_Attr(@) {
     </ul>
     <br>
     
-    <a name="Helloset"></a>
+    <a name="TradfriGroupset"></a>
     <b>Set</b><br>
     <ul>
         <code>set &lt;name&gt; &lt;option&gt; [&lt;value&gt;]</code>
@@ -338,12 +338,12 @@ sub TradfriGroup_Attr(@) {
                   Set the brightness of all devices in the group.<br>
                   You need to specify the brightness value as an integer between 0 and 254.<br>
                   A brightness value of 0 turns the devices off.<br>
-                  If the devies are off, and you set a value greater than 0, they'll turn on.</li>
+                  If the devices are off, and you set a value greater than 0, they'll turn on.</li>
         </ul>
     </ul>
     <br>
 
-    <a name="Helloget"></a>
+    <a name="TradfriGroupget"></a>
     <b>Get</b><br>
     <ul>
         <code>get &lt;name&gt; &lt;option&gt;</code>
@@ -379,7 +379,7 @@ sub TradfriGroup_Attr(@) {
     </ul>
     <br>
     
-    <a name="Helloattr"></a>
+    <a name="HTradfriGroupattr"></a>
     <b>Attributes</b>
     <ul>
         <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>

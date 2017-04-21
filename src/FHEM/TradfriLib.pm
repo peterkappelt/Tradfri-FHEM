@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.4
+# @version 1.5
 
 package TradfriLib;
 use strict;
@@ -94,6 +94,30 @@ sub getDeviceName{
 	return $_[0]->{9001};
 }
 
+#get the device's brightness
+#you must pass the return code of getDeviceInfo as the first argument
+sub getDeviceBrightness{
+	return $_[0]->{3311}[0]->{5851};
+}
+
+#get the device's on/ off state
+#you must pass the return code of getDeviceInfo as the first argument
+sub getDeviceOnOff{
+	return $_[0]->{3311}[0]->{5850};
+}
+
+#get the timestamp, when the device was created
+#you must pass the return code of getGroupInfo as the first argument
+sub getDeviceCreatedAt{
+	return $_[0]->{9002};
+}
+
+#get the  software version of the device
+#you must pass the return code of getGroupInfo as the first argument
+sub getDeviceSoftwareVersion{
+	return $_[0]->{3}{3};
+}
+
 #this returns the groups, which are configured on the hub
 #it is an array, with one group id per element
 #first arg: gateway address
@@ -140,12 +164,6 @@ sub getGroupOnOff{
 #you must pass the return code of getGroupInfo as the first argument
 sub getGroupCreatedAt{
 	return $_[0]->{9002};
-}
-
-#get the name of a group
-#you must pass the return code of getGroupInfo as the first argument
-sub getGroupName{
-	return $_[0]->{9001};
 }
 
 # The output of the path PATH_GROUP_ROOT/GROUP_ADDRESS looks like follows:
