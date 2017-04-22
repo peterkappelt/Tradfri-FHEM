@@ -1,6 +1,6 @@
-# FHEM Trådfri Module
+# FHEM Trï¿½dfri Module
 
-This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
+This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trï¿½dfri gateway.
 
 ## Install to FHEM
 Run the following commands to add this repository to your FHEM setup:
@@ -14,7 +14,7 @@ Since there is no documentation yet, FHEM might throw some errors during update.
 
 ## Prerequisites
 
-You need to have an IKEA Trådfri Bulb or Panel, a Control-Device (e.g. the Dimmer) and the Gateway.  
+You need to have an IKEA Trï¿½dfri Bulb or Panel, a Control-Device (e.g. the Dimmer) and the Gateway.  
 The gateway has to be set-up with the App, the control device and the bulbs need to be paired.  
 __Caution__: Do not make the same mistake I've made. You can __not__ just buy a bulb and a gateway. You need a control device, like the round dimmer, too!
 
@@ -40,20 +40,21 @@ Note: An user reported, that he had to install "autoconf" on his system. You can
 
 You can currently do the following with the devices.
 Please note, that this module is still in development and there will be new functionality.  
-||Devices|Groups|
-| --- |:---:|:---:|
-|Turn on/ off|X|X|
-|Get on/ off state|X||
-|Update on/ off state periodically|X||
-|Update on/ off state in realtime|||
-|Set brightness|X|X|
-|Get brightness|X||
-|Update brightness periodically|X||
-|Update brightness in realtime|||
-|Set the color temperature|X||
-|Get the color temperature||
-|Update the color periodically|||
-|Update the color in realtime|||
+
+| a | Devices | Groups |  
+| --- | --- | --- |  
+| Turn on/ off | X | X |  
+| Get on/ off state |X||
+| Update on/ off state periodically |X||
+| Update on/ off state in realtime |||
+| Set brightness |X|X|
+| Get brightness |X||
+| Update brightness periodically |X||
+| Update brightness in realtime |||
+| Set the color temperature |X||
+| Get the color temperature ||
+| Update the color periodically |||
+| Update the color in realtime |||
 
 Additional features:
 * Get information about a bulb, e.g. firmware version and type
@@ -107,7 +108,7 @@ You need to do as follows in order to control a bulb:
 
 ## What to do, if my FHEM isn't responding anymore?
 
-Actually, this shouldn't happen anymore. Wait 5 seconds, and all processes, that are related to this Trådfri module, should kill themselves (if there is a configuration error, that isn't yet handled by this module).    
+Actually, this shouldn't happen anymore. Wait 5 seconds, and all processes, that are related to this Trï¿½dfri module, should kill themselves (if there is a configuration error, that isn't yet handled by this module).    
 If you managed to kill this module, fell free to contact me (with your log, you configuration and a description, of what you did to make FHEM unresponsible).
 
 ## Credits
