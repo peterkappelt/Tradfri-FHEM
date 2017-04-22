@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.5
+# @version 1.6
 
 package TradfriLib;
 use strict;
@@ -166,7 +166,7 @@ sub getGroupCreatedAt{
 	return $_[0]->{9002};
 }
 
-# The output of the path PATH_GROUP_ROOT/GROUP_ADDRESS looks like follows:
+# The output of the path PATH_GROUP_ROOT/GROUP_ADDRESS looks like follows (for bulbs, that can not change color)
 #$VAR1 = {
 #          '9003' => 193768,						-> id
 #          '9018' => {								-> "HS_ACCESSORY_LINK"
@@ -184,8 +184,9 @@ sub getGroupCreatedAt{
 #          '9002' => 1492280898,					-> created at
 #          '9001' => 'TRADFRI group'				-> name
 #        };
-
-# The output of the path PATH_DEVICE_ROOT/LAMP_ADDRESS looks like follows.
+#
+#
+# The output of the path PATH_DEVICE_ROOT/LAMP_ADDRESS looks like follows. (for bulbs, that can not change color temperature)
 # We can just write single values to change the attributes
 
 # $VAR1 = {
@@ -203,15 +204,45 @@ sub getGroupCreatedAt{
 		  # '3' => {
 				   # '0' => 'IKEA of Sweden',			-> manufacturer	
 				   # '2' => '',
-				  # '3' => '1.1.1.0-5.7.2.0',			-> version
+				  # '3' => '1.1.1.0-5.7.2.0',			-> sw version
 				   # '6' => 1,
 				   # '1' => 'TRADFRI bulb E27 opal 1000lm'		-> product name
 				 # },
 		  # '9001' => 'Fenster Links',			-> user defined name
 		  # '9002' => 1492280964,				-> created at
-		  # '5750' => 2							-> application type?!
+		  # '5750' => 2							-> type
 		# };
 
+# for bulbs, that change color:
+#$VAR1 = { 
+#          '9019' => 1, 											-> reachability state
+#          '3' => { 
+#                   '6' => 1, 
+#                   '0' => 'IKEA of Sweden', 						-> manufacturer
+#                   '3' => '1.1.1.1-5.7.2.0', 						-> software version
+#                   '1' => 'TRADFRI bulb E14 WS opal 400lm', 		-> product name
+#                   '2' => '' 
+#                 }, 
+#          '5750' => 2, 											-> type: bulb?, but no information about the type		
+#          '3311' => [ 												-> light information
+#                      { 
+#                        '5850' => 1, 								-> on/ off
+#                        '5710' => 24694, 							-> color_y (CIE1931 model, max 65535)
+#                        '5707' => 0, 								
+#                        '5851' => 7, 								-> dim value (brightness)
+#                        '5711' => 0, 								
+#                        '5709' => 24930, 							-> color_x (CIE1931 model, max 65535)
+#                        '9003' => 0, 								-> instance id?
+#                        '5708' => 0, 
+#                        '5706' => 'f5faf6' 						-> rgb color code
+#                      } 
+#                    ], 
+#          '9001' => 'TRADFRI bulb E14 WS opal 400lm', 				-> user defined name
+#          '9002' => 1492802359, 									-> paired/ created at
+#          '9020' => 1492863561, 									-> last seen				
+#          '9003' => 65539, 										-> device id
+#          '9054' => 0 												-> OTA update state
+#        }; 
 
 #turn a lamp on or off
 #this requires two arguments: the lamp address and the on/off state (as 0 or 1)
@@ -233,7 +264,7 @@ sub lampSetOnOff{
 }
 
 #set the dimming brightness of a lamp
-#this requires two arguments: the lamp address and the dimming value, between 0 and 254 (including these values)
+#this requires four arguments: gateway address, gateway secret, the lamp address and the dimming value, between 0 and 254 (including these values)
 sub lampSetBrightness{
 		my $lampAddress = $_[2];
 		my $brightness = $_[3];
@@ -255,6 +286,33 @@ sub lampSetBrightness{
 		};
 
 		coapCommand($_[0], $_[1], 'PUT', PATH_DEVICE_ROOT . "/$lampAddress", $command);
+}
+
+#set the color of a lamp
+#this requires five arguments:
+#	- gateway address,
+#	- gateway secret
+#	- the lamp address,
+#	- rgb color string, hexadecimal notation
+#
+# ikea uses the following combinations:
+# F1E0B5 for standard
+# F5FAF6 for cold
+# EFD275 for warm
+sub lampSetColorRGB{
+	my $lampAddress = $_[2];
+	my $rgb = $_[3];
+
+	#caution: we need an hash reference here, so it must be defined with $
+	my $command = {
+			'3311' => [
+					{
+							'5706' => $rgb,
+					}
+			]
+	};
+
+	coapCommand($_[0], $_[1], 'PUT', PATH_DEVICE_ROOT . "/$lampAddress", $command);
 }
 
 #turn all devices in a group on or off

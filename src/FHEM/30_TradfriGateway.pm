@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.5
+# @version 1.6
 
 package main;
 use strict;

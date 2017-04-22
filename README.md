@@ -34,22 +34,35 @@ git submodule update --init --recursive
 make
 sudo make install
 ```
+Note: An user reported, that he had to install "autoconf" on his system. You can just run "sudo apt-get install autoconf" on your system.
 
 ## What this module can do
 
-Theres's currently only very basic functionality implemented.  
-You can:
-* Turn a bulb on or off
-* Set the brightness of a bulb
-* Get information about the bulb, e.g. firmware version and type
+You can currently do the following with the devices.
+Please note, that this module is still in development and there will be new functionality.  
+||Devices|Groups|
+|---|:---:|:---:|
+|Turn on/ off|X|X|
+|Get on/ off state|X||
+|Update on/ off state periodically|X||
+|Update on/ off state in realtime|||
+|Set brightness|X|X|
+|Get brightness|X||
+|Update brightness periodically|X||
+|Update brightness in realtime|||
+|Set the color temperature|X||
+|Get the color temperature||
+|Update the color periodically|||
+|Update the color in realtime|||
+
+Additional features:
+* Get information about a bulb, e.g. firmware version and type
 * Get the IDs of all devices that are connected to the gateway
 * Get the IDs of all groups that are configured in the gateway
-* Turn a group on or off
-* Set the brightness of a group
-* Get information about groups (created at, name, member devices, ...) -> currently can't read brightness and state
+
+...and some more features, that aren't listed here (but in the FHEM command reference)
 ## What this module can not do
 These points will be implemented later:
-* Set the color temperature of a bulb that is able to do that
 * Pair new devices
 * Read information from the bulb, like the current brightness, and react to it
 
@@ -75,7 +88,8 @@ You need to do as follows in order to control a bulb:
 * You can now control this device:  
    `set Bulb1 on` will turn the lamp on  
    `set Bulb1 off` will turn the lamp off  
-   `set Bulb1 dimvalue x` will set the lamp's brightness, where x is between 0 and 254 
+   `set Bulb1 dimvalue x` will set the lamp's brightness, where x is between 0 and 254   
+   `set Bulb1 color warm` will set the lamp to warm-white (if supported)
 * You can get additional information about controlling devices in the automatically generated FHEM HTML command reference, under TradfriDevice
 ### 3. Control a lighting group
 * Get the list of groups: `get TradfriGW groupList`. It will return something like that:  

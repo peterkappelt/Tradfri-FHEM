@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.5
+# @version 1.6
 
 package main;
 use strict;
@@ -25,6 +25,7 @@ my %TradfriDevice_sets = (
 	'on'		=> '',
 	'off'		=> '',	
 	'dimvalue'	=> '',
+	'color'		=> '',
 );
 
 sub TradfriDevice_Initialize($) {
@@ -246,18 +247,20 @@ sub TradfriDevice_Set($@) {
 		return "Unknown argument $opt, choose one of " . join(" ", @cList);
 	}
 	
-	$hash->{STATE} = $TradfriDevice_sets{$opt} = $value;
+	$TradfriDevice_sets{$opt} = $value;
 
 	if($opt eq "on"){
 		if(!$hash->{IODev}{canConnect}){
 			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
 		}
+		$hash->{STATE} = 'on';
 		TradfriLib::lampSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, 1);
 		readingsSingleUpdate($hash, 'state', 'on', 1);
 	}elsif($opt eq "off"){
 		if(!$hash->{IODev}{canConnect}){
 			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
 		}
+		$hash->{STATE} = 'off';
 		TradfriLib::lampSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, 0);
 		readingsSingleUpdate($hash, 'state', 'off', 1);
 	}elsif($opt eq "dimvalue"){
@@ -267,6 +270,27 @@ sub TradfriDevice_Set($@) {
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 		TradfriLib::lampSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, int($value));
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
+	}elsif($opt eq "color"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+
+		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
+		
+		my $rgb;
+
+		if($value eq "warm"){
+			$rgb = 'EFD275';
+		}elsif($value eq "cold"){
+			$rgb = 'F5FAF6';
+		}elsif($value eq "standard"){
+			$rgb = 'F1E0B5';
+		}else{
+			$rgb = $value;
+		}
+		
+		TradfriLib::lampSetColorRGB($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, $rgb);
+		readingsSingleUpdate($hash, 'color', $rgb, 1);
 	}
 
 	return undef;
@@ -338,6 +362,17 @@ sub TradfriDevice_Attr(@) {
                   You need to specify the brightness value as an integer between 0 and 254.<br>
                   A brightness value of 0 turns the device off.<br>
                   If the device is off, and you set a value greater than 0, it will turn on.</li>
+              <li><i>color</i>
+                  Set the color temperature of a bubl<br>
+                  Of course, that only works with bulbs, that can change their color temperature<br>
+                  You may pass "warm", "cold", "standard" or a RGB code in the format "RRGGBB" (though you can't use all RGB codes)<br>
+                  IKEA uses the following RGB codes for their temperatures:<br>
+				  <ul>
+					<li>F1E0B5 for standard</li>
+					<li>F5FAF6 for cold</li>
+					<li>EFD275 for warm</li>
+				  </ul>
+                  </li>
         </ul>
     </ul>
     <br>
