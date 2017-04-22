@@ -40,21 +40,20 @@ Note: An user reported, that he had to install "autoconf" on his system. You can
 
 You can currently do the following with the devices.
 Please note, that this module is still in development and there will be new functionality.  
-|                                   | Devices | Groups |
-|-----------------------------------|---------|--------|
-|                      Turn on/ off |    X    |    X   |
-|                 Get on/ off state |    X    |        |
-| Update on/ off state periodically |    X    |        |
-|  Update on/ off state in realtime |         |        |
-|                    Set brightness |    X    |    X   |
-|                    Get brightness |    X    |        |
-|    Update brightness periodically |    X    |        |
-|     Update brightness in realtime |         |        |
-|         Set the color temperature |    X    |        |
-|         Get the color temperature |         |        |
-|     Update the color periodically |         |        |
-|      Update the color in realtime |         |        |
-
+||Devices|Groups|
+| --- |:---:|:---:|
+|Turn on/ off|X|X|
+|Get on/ off state|X||
+|Update on/ off state periodically|X||
+|Update on/ off state in realtime|||
+|Set brightness|X|X|
+|Get brightness|X||
+|Update brightness periodically|X||
+|Update brightness in realtime|||
+|Set the color temperature|X||
+|Get the color temperature||
+|Update the color periodically|||
+|Update the color in realtime|||
 
 Additional features:
 * Get information about a bulb, e.g. firmware version and type
