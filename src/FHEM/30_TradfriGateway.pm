@@ -53,13 +53,19 @@ sub TradfriGateway_Define($$) {
 	my @param = split('[ \t]+', $def);
 	
 	if(int(@param) < 4) {
-		return "too few parameters: define <name> TradfriGateway <gateway-ip> <gateway-secret>";
+		return "too few parameters: define <name> TradfriGateway <gateway-ip> <gateway-secret> [<coap-client-directory>]";
 	}
 	
 	$hash->{name}  = $param[0];
 
 	$hash->{gatewayAddress} = $param[2];
 	$hash->{gatewaySecret} = $param[3];
+
+	if(int(@param) > 4){
+		#there was a fifth parameter
+		#it is the path to the coap client, add it to the environments path
+		$ENV{PATH}="$ENV{PATH}:" . $param[4];
+	}
 
 	checkCoapClient($hash);
 

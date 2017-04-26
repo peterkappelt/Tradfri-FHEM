@@ -75,7 +75,14 @@ You need to do as follows in order to control a bulb:
 * You can use the gateway's IP address or its DNS name
 * You can find the Secret Key on the bottom side of your gateway. It is marked as the "Security Code".
 * Save your config by running the `save` command in FHEM 
+* Check, whether the module can detect and access the just compiled software "coap-client" by running `get TradfriGW coapClientVersion`. If it returns something, that looks like a version number, everything should be fine. If it returns "UNKNOWN" there is a problem. Probably, the coap-client directory is not stored in path.
 
+#### Debugging get coapClientVersion = UNKNOWN
+* run `which coap-client` on the system command line. If this command returns nothing, it is likely, that there was an error while compiling and installing libcoap. 
+* On my system, it returns "/usr/local/bin/coap-client"
+* Remove the last part from the path and remember it, now I've got "/usr/local/bin"
+* Edit the definition of the gateway device and append the coap path to its definition: `defmod TradfriGW TradfriGateway <Gateway-IP> <Gateway-Secret-Key> /usr/local/bin`
+* For those, who are used to linux: The third parameter adds something to the FHEM PATH-variable, so the module is able to locate the coap-client
 ### 2. Control a single device
 * Get the list of devices: `get TradfriGW deviceList`. It will return something like that:  
    ```
