@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.6
+# @version 1.8
 
 package main;
 use strict;
@@ -244,7 +244,8 @@ sub TradfriDevice_Set($@) {
 	
 	if(!defined($TradfriDevice_sets{$opt})) {
 		my @cList = keys %TradfriDevice_sets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
+		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
+		return "Unknown argument $opt, choose one of on off dimvalue:slider,0,1,254 color:warm,cold,standard";
 	}
 	
 	$TradfriDevice_sets{$opt} = $value;

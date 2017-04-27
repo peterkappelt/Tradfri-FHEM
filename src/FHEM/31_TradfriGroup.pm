@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.6
+# @version 1.8
 
 package main;
 use strict;
@@ -239,7 +239,8 @@ sub TradfriGroup_Set($@) {
 	
 	if(!defined($TradfriGroup_sets{$opt})) {
 		my @cList = keys %TradfriGroup_sets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
+		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
+		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,254 off on";
 	}
 	
 	$hash->{STATE} = $TradfriGroup_sets{$opt} = $value;

@@ -98,6 +98,7 @@ You need to do as follows in order to control a bulb:
    `set Bulb1 off` will turn the lamp off  
    `set Bulb1 dimvalue x` will set the lamp's brightness, where x is between 0 and 254   
    `set Bulb1 color warm` will set the lamp to warm-white (if supported)
+* If you like to set the color temperature and the brightness directly in the web-interface, set the attribute webCmd to `dimvalue:color`
 * You can get additional information about controlling devices in the automatically generated FHEM HTML command reference, under TradfriDevice
 ### 3. Control a lighting group
 * Get the list of groups: `get TradfriGW groupList`. It will return something like that:  
@@ -111,6 +112,7 @@ You need to do as follows in order to control a bulb:
    `set Group1 on` will turn all devices in the group on  
    `set Group1 off` will turn all devices in the group off
    `set Group1 dimvalue x` will set all brightnesses of the group to a certain value, where x is between 0 and 254 
+* If you like to set the brightness directly in the web-interface, set the attribute webCmd to `dimvalue`
 * You can get additional information about controlling groups in the automatically generated FHEM HTML command reference, under TradfriGroup
 
 ## What to do, if my FHEM isn't responding anymore?
