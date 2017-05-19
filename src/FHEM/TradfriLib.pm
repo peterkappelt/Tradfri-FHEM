@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.8
+# @version 1.9
 
 package TradfriLib;
 use strict;

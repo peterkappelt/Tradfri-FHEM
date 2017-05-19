@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.8
+# @version 1.9
 
 package main;
 use strict;
@@ -129,7 +129,8 @@ sub TradfriGateway_Get($@) {
 			$returnUserString .= "- " .
 				${$groupIDList}[$i] .
 				": " .
-				TradfriLib::getGroupName($groupInfo);
+				TradfriLib::getGroupName($groupInfo) . 
+				"\n";
 
 		}
 
