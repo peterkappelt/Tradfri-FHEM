@@ -42,7 +42,7 @@ You can currently do the following with the devices.
 Please note, that this module is still in development and there will be new functionality.  
 
 |  | Devices | Groups |  
-| --- | --- | --- |  
+| ---:|:---:|:---:|  
 | Turn on/ off | X | X |  
 | Get on/ off state | X | X |
 | Update on/ off state periodically | X | X |
@@ -51,13 +51,13 @@ Please note, that this module is still in development and there will be new func
 | Get brightness | X | X |
 | Update brightness periodically | X | X |
 | Update brightness in realtime |||
-| Set the color temperature |X||
-| Get the color temperature ||
-| Update the color periodically |||
+| Set the color temperature | X ||
+| Get the color temperature | X ||
+| Update the color periodically | X ||
 | Update the color in realtime |||
 
 Additional features:
-* Get information about a bulb, e.g. firmware version and type
+* Get information about a bulb, e.g. firmware version, type and reachable state
 * Get the IDs of all devices that are connected to the gateway
 * Get the IDs of all groups that are configured in the gateway
 

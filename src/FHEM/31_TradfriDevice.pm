@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.10
+# @version 1.11
 
 package main;
 use strict;
@@ -17,6 +17,9 @@ my %TradfriDevice_gets = (
 	'state'			=> ' ',
 	'name'			=> ' ',
 	'createdAt'		=> ' ',
+	'reachableState'=> ' ',
+	'lastSeen'		=> ' ',
+	'color'			=> ' ',
 	'softwareVersion' => ' ',
 	'updateInfo'	=> ' ',
 );
@@ -198,6 +201,48 @@ sub TradfriDevice_Get($@) {
 		my $version = TradfriLib::getDeviceSoftwareVersion($jsonDeviceInfo);
 		readingsSingleUpdate($hash, 'softwareVersion', $version, 1);
 		return $version;
+	}elsif($opt eq 'reachableState'){
+		#check, whether we can connect to the gateway
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+
+		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
+		if($jsonDeviceInfo ~~ undef){
+			return "Error while fetching device info!";
+		}
+
+		my $reachable = TradfriLib::getDeviceReachableState($jsonDeviceInfo);
+		readingsSingleUpdate($hash, 'reachableState', $reachable, 1);
+		return $reachable;
+	}elsif($opt eq 'lastSeen'){
+		#check, whether we can connect to the gateway
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+
+		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
+		if($jsonDeviceInfo ~~ undef){
+			return "Error while fetching device info!";
+		}
+
+		my $lastSeen = FmtDateTimeRFC1123(TradfriLib::getDeviceLastSeen($jsonDeviceInfo));
+		readingsSingleUpdate($hash, 'lastSeen', $lastSeen, 1);
+		return $lastSeen;
+	}elsif($opt eq 'color'){
+		#check, whether we can connect to the gateway
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+
+		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
+		if($jsonDeviceInfo ~~ undef){
+			return "Error while fetching device info!";
+		}
+
+		my $color = TradfriLib::getDeviceColor($jsonDeviceInfo);
+		readingsSingleUpdate($hash, 'color', $color, 1);
+		return $color;
 	}elsif($opt eq 'updateInfo'){
 		#check, whether we can connect to the gateway
 		if(!$hash->{IODev}{canConnect}){
@@ -215,6 +260,9 @@ sub TradfriDevice_Get($@) {
 		my $state = TradfriLib::getDeviceOnOff($jsonDeviceInfo) ? 'on':'off';
 		my $name = TradfriLib::getDeviceName($jsonDeviceInfo);
 		my $createdAt = FmtDateTimeRFC1123(TradfriLib::getDeviceCreatedAt($jsonDeviceInfo));
+		my $reachableState = TradfriLib::getDeviceReachableState($jsonDeviceInfo);
+		my $lastSeen = FmtDateTimeRFC1123(TradfriLib::getDeviceLastSeen($jsonDeviceInfo));
+		my $color = TradfriLib::getDeviceColor($jsonDeviceInfo);
 		my $version = TradfriLib::getDeviceSoftwareVersion($jsonDeviceInfo);
 
 		readingsBeginUpdate($hash);
@@ -225,6 +273,9 @@ sub TradfriDevice_Get($@) {
 		readingsBulkUpdateIfChanged($hash, 'softwareVersion', $version, 1);
 		readingsBulkUpdateIfChanged($hash, 'type', $type, 1);
 		readingsBulkUpdateIfChanged($hash, 'manufacturer', $manufacturer, 1);
+		readingsBulkUpdateIfChanged($hash, 'reachableState', $reachableState, 1);
+		readingsBulkUpdateIfChanged($hash, 'color', $color, 1);
+		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
 		readingsEndUpdate($hash, 1);	
 	}
 
@@ -367,12 +418,13 @@ sub TradfriDevice_Attr(@) {
                   Set the color temperature of a bubl<br>
                   Of course, that only works with bulbs, that can change their color temperature<br>
                   You may pass "warm", "cold", "standard" or a RGB code in the format "RRGGBB" (though you can't use all RGB codes)<br>
-                  IKEA uses the following RGB codes for their temperatures:<br>
+                  IKEA uses the following RGB codes for their colors:<br>
 				  <ul>
 					<li>F1E0B5 for standard</li>
 					<li>F5FAF6 for cold</li>
 					<li>EFD275 for warm</li>
 				  </ul>
+				  Other RGB codes than listed here do not work with the current bulb (they only set their color to those three values).
                   </li>
         </ul>
     </ul>
@@ -408,9 +460,26 @@ sub TradfriDevice_Attr(@) {
                   Get user software version of the device<br>
                   Additionally, the reading "softwareVersion" gets set to the resulting value.</li>
               <li><i>state</i><br>
-                  Get the state (-> on/off) of the group<br>
-                  Additionally, the reading "state" gets set to the resulting value.<br>
-                  Caution: As it seems, this value does not represent the actual value of the group's state (just the last value you set in FHEM), so it is basically useless. A solution is in work.</li>
+                  Get the state (-> on/off) of the device<br>
+                  Additionally, the reading "state" gets set to the resulting value.</li>
+              <li><i>reachableState</i><br>
+                  Get, whether the device is reported as reachable by the gateway.<br>
+                  Additionally, the reading "reachableState" gets set to the resulting value.</li>
+              <li><i>lastSeen</i><br>
+                  Get a timestamp, when the device was last seen by the gateay.<br>
+                  However, this value seems to be somehow senseless. In my case, the devices were last seen about three hours ago - though I've just set/ read their values<br>
+                  Futher investigation of this value is required<br>
+                  Additionally, the reading "lastSeen" gets set to the resulting value.</li>
+              <li><i>color</i><br>
+                  Get the RGB color code that the bulb is set to, in format rrggbb.<br>
+                  If the device doesn't support to change the color, this will return 0<br>
+                  IKEA uses the following RGB codes for their colors:<br>
+                  <ul>
+					<li>F1E0B5 for standard</li>
+					<li>F5FAF6 for cold</li>
+					<li>EFD275 for warm</li>
+				  </ul>
+                  Additionally, the reading "color" gets set to the resulting value.</li>
               <li><i>type</i><br>
                   Get the type of the device<br>
                   Additionally, the reading "type" gets set to the resulting value.<br>
@@ -421,7 +490,7 @@ sub TradfriDevice_Attr(@) {
 					</ul>
                   </li>
               <li><i>updateInfo</i><br>
-                  Update the readings createdAt, dimvalue, manufacturer, name, softwareVersion, state and type according to the above described values.</li>
+                  Update the readings createdAt, dimvalue, manufacturer, name, softwareVersion, state, reachableState, lastSeen and type according to the above described values.</li>
         </ul>
     </ul>
     <br>

@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.10
+# @version 1.11
 
 package TradfriLib;
 use strict;
@@ -116,6 +116,28 @@ sub getDeviceCreatedAt{
 #you must pass the return code of getGroupInfo as the first argument
 sub getDeviceSoftwareVersion{
 	return $_[0]->{3}{3};
+}
+
+#get, whether the device is reachable
+#you must pass the return code of getGroupInfo as the first argument
+sub getDeviceReachableState{
+	return $_[0]->{9019};
+}
+
+#get the timestamp, when the device was last seen by the gateway
+#you must pass the return code of getGroupInfo as the first argument
+sub getDeviceLastSeen{
+	return $_[0]->{9020};
+}
+
+#get the device color code
+#if the device cannot change its color, this function returns 0
+#you must pass the return code of getGroupInfo as the first argument
+sub getDeviceColor{
+	if(exists($_[0]->{3311}[0]->{5706})){
+		return $_[0]->{3311}[0]->{5706};
+	}
+	return 0;
 }
 
 #this returns the groups, which are configured on the hub

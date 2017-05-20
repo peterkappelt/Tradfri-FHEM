@@ -1,3 +1,7 @@
+- 20.5.2017 (1.11)
+  - feature:    31_TradfriDevice: get color
+  - feature:    31_TradfriDevice: get lastSeen and reachable
+
 - 20.5.2017 (1.10)
   - feature:    31_TradfriGroup: can now read brightness and state correctly
 
