@@ -1,3 +1,6 @@
+- 20.5.2017 (1.10)
+  - feature:    31_TradfriGroup: can now read brightness and state correctly
+
 - 19.5.2017 (1.9)
   - bugfix:     30_TradfriGateway: get groupList now displays correctly
 

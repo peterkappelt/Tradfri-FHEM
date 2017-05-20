@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.9
+# @version 1.10
 
 package main;
 use strict;
@@ -150,7 +150,7 @@ sub TradfriGroup_Get($@) {
 			return "Error while fetching group info!";
 		}
 
-		my $dimvalue = TradfriLib::getGroupBrightness($jsonGroupInfo);
+		my $dimvalue = TradfriLib::getGroupBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo);
 		readingsSingleUpdate($hash, 'dimvalue', $dimvalue, 1);
 		return $dimvalue;
 	}elsif($opt eq 'state'){
@@ -164,7 +164,7 @@ sub TradfriGroup_Get($@) {
 			return "Error while fetching group info!";
 		}
 
-		my $state = TradfriLib::getGroupOnOff($jsonGroupInfo) ? 'on':'off';
+		my $state = TradfriLib::getGroupOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo) ? 'on':'off';
 		readingsSingleUpdate($hash, 'state', $state, 1);
 		return $state;
 	}elsif($opt eq 'name'){
@@ -211,8 +211,8 @@ sub TradfriGroup_Get($@) {
 		my $name = TradfriLib::getGroupName($jsonGroupInfo);
 		my $memberArray = TradfriLib::getGroupMembers($jsonGroupInfo);
 		my $members = join(' ', @{$memberArray});
-		my $dimvalue = TradfriLib::getGroupBrightness($jsonGroupInfo);
-		my $state = TradfriLib::getGroupOnOff($jsonGroupInfo) ? 'on':'off';
+		my $dimvalue = TradfriLib::getGroupBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo);
+		my $state = TradfriLib::getGroupOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo) ? 'on':'off';
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
@@ -360,8 +360,8 @@ sub TradfriGroup_Attr(@) {
                   Additionally, the reading "createdAt" gets set to the resulting value.</li>
               <li><i>dimvalue</i><br>
                   Get the brightness value of the group<br>
-                  Additionally, the reading "dimvalue" gets set to the resulting value.<br>
-                  Caution: As it seems, this value does not represent the actual value of the group's brightness (just the last value you set in FHEM), so it is basically useless. A solution is in work.</li>
+                  If the member devices are set to different brightnesses, this will return the mean of the member brightnesses<br>
+                  Additionally, the reading "dimvalue" gets set to the resulting value.</li>
               <li><i>groupInfo</i><br>
                   The RAW JSON-formatted data, that was returned from the group info. Just for development and/ or additional info</li>
         	  <li><i>groupMembers</i><br>
@@ -372,15 +372,15 @@ sub TradfriGroup_Attr(@) {
                   Additionally, the reading "name" gets set to the resulting value.</li>
               <li><i>state</i><br>
                   Get the state (-> on/off) of the group<br>
-                  Additionally, the reading "state" gets set to the resulting value.<br>
-                  Caution: As it seems, this value does not represent the actual value of the group's state (just the last value you set in FHEM), so it is basically useless. A solution is in work.</li>
+                  It is "on", if at least one of the member devices is on<br>
+                  Additionally, the reading "state" gets set to the resulting value.</li>
               <li><i>updateInfo</i><br>
                   Update the readings createdAt, dimvalue, members, name, state according to the above described values.</li>
         </ul>
     </ul>
     <br>
     
-    <a name="HTradfriGroupattr"></a>
+    <a name="TradfriGroupattr"></a>
     <b>Attributes</b>
     <ul>
         <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>

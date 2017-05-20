@@ -44,12 +44,12 @@ Please note, that this module is still in development and there will be new func
 |  | Devices | Groups |  
 | --- | --- | --- |  
 | Turn on/ off | X | X |  
-| Get on/ off state |X||
-| Update on/ off state periodically |X||
+| Get on/ off state | X | X |
+| Update on/ off state periodically | X | X |
 | Update on/ off state in realtime |||
-| Set brightness |X|X|
-| Get brightness |X||
-| Update brightness periodically |X||
+| Set brightness | X | X |
+| Get brightness | X | X |
+| Update brightness periodically | X | X |
 | Update brightness in realtime |||
 | Set the color temperature |X||
 | Get the color temperature ||

@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.9
+# @version 1.10
 
 package TradfriLib;
 use strict;
@@ -149,15 +149,62 @@ sub getGroupMembers{
 }
 
 #get the current dimming value of a group
-#you must pass the return code of getGroupInfo as the first argument
+#
+# CAUTION: the parameters are different than those of the other functions
+#
+#takes three arguments:
+#first arg: gateway address
+#second arg: gateway secret
+#third arg: return of getGroupInfo
 sub getGroupBrightness{
-	return $_[0]->{5851};
+	#the brightness-value off the group can not just be returned
+	#it is a write-only key, so it contains the last written value (but not the actual value)
+	#read the brightnesses of the member devices and return their mean
+	my @groupMembers = @{getGroupMembers($_[2])};
+
+	my $validDeviceCount = 0;
+	my $deviceBrightnessMean = 0;
+
+	for(my $i = 0; $i < scalar(@groupMembers); $i++){
+		my $currentDeviceInfo = getDeviceInfo($_[0], $_[1], $groupMembers[$i]);
+		
+		#only if key 3311 exists, it is a device that contains a dimming value (a dimmer doesn't contain one)
+		if(exists($currentDeviceInfo->{3311})){
+			$validDeviceCount++;
+			$deviceBrightnessMean += $currentDeviceInfo->{3311}[0]->{5851};
+		}
+	}
+
+	return ($deviceBrightnessMean / $validDeviceCount);
+
+	#return $_[0]->{5851};
 }
 
 #get the current on/off state of a group
+#
+# CAUTION: the parameters are different than those of the other functions
+#
 #you must pass the return code of getGroupInfo as the first argument
+#takes three arguments:
+#first arg: gateway address
+#second arg: gateway secret
+#third arg: return of getGroupInfo
 sub getGroupOnOff{
-	return $_[0]->{5850};
+	#the on/off-value off the group can not just be returned
+	#it is a write-only key, so it contains the last written value (but not the actual value)
+	#read the state of the member devices and return 1, if at least one device is on
+	my @groupMembers = @{getGroupMembers($_[2])};
+
+	for(my $i = 0; $i < scalar(@groupMembers); $i++){
+		my $currentDeviceInfo = getDeviceInfo($_[0], $_[1], $groupMembers[$i]);
+		
+		#only if key 3311 exists, it is a device that contains a dimming value (a dimmer doesn't contain one)
+		if(exists($currentDeviceInfo->{3311})){
+			return 1 if $currentDeviceInfo->{3311}[0]->{5850} == 1;
+		}
+	}
+
+	return 0;
 }
 
 #get the timestamp, when the group was created
