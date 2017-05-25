@@ -1,3 +1,7 @@
+- 25.5.2017 (1.12)
+  - feature:    31_TradfriDevice: attr "usePercentDimming"
+  - feature:    31_TradfriGroup: attr "usePercentDimming"
+
 - 20.5.2017 (1.11)
   - feature:    31_TradfriDevice: get color
   - feature:    31_TradfriDevice: get lastSeen and reachable

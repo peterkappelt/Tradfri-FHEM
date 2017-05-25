@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.11
+# @version 1.12
 
 package TradfriLib;
 use strict;
@@ -197,7 +197,7 @@ sub getGroupBrightness{
 		}
 	}
 
-	return ($deviceBrightnessMean / $validDeviceCount);
+	return int($deviceBrightnessMean / $validDeviceCount + 0.5);
 
 	#return $_[0]->{5851};
 }

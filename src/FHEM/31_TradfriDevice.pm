@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.11
+# @version 1.12
 
 package main;
 use strict;
@@ -45,6 +45,7 @@ sub TradfriDevice_Initialize($) {
 
 	$hash->{AttrList} =
 		"autoUpdateInterval "
+		. "usePercentDimming:1,0"
 		. $readingFnAttributes;
 }
 
@@ -142,6 +143,8 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $dimvalue = TradfriLib::getDeviceBrightness($jsonDeviceInfo);
+
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
 		readingsSingleUpdate($hash, 'dimvalue', $dimvalue, 1);
 		return($dimvalue);
@@ -257,6 +260,7 @@ sub TradfriDevice_Get($@) {
 		my $manufacturer = TradfriLib::getDeviceManufacturer($jsonDeviceInfo);
 		my $type = TradfriLib::getDeviceType($jsonDeviceInfo);
 		my $dimvalue = TradfriLib::getDeviceBrightness($jsonDeviceInfo);
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 		my $state = TradfriLib::getDeviceOnOff($jsonDeviceInfo) ? 'on':'off';
 		my $name = TradfriLib::getDeviceName($jsonDeviceInfo);
 		my $createdAt = FmtDateTimeRFC1123(TradfriLib::getDeviceCreatedAt($jsonDeviceInfo));
@@ -296,7 +300,10 @@ sub TradfriDevice_Set($@) {
 	if(!defined($TradfriDevice_sets{$opt})) {
 		my @cList = keys %TradfriDevice_sets;
 		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
-		return "Unknown argument $opt, choose one of on off dimvalue:slider,0,1,254 color:warm,cold,standard";
+		my $dimvalueMax = 254;
+		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+
+		return "Unknown argument $opt, choose one of on off dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
 	}
 	
 	$TradfriDevice_sets{$opt} = $value;
@@ -320,7 +327,12 @@ sub TradfriDevice_Set($@) {
 			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
 		}
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
-		TradfriLib::lampSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, int($value));
+		
+		my $dimvalue = int($value);
+		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+
+
+		TradfriLib::lampSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, $dimvalue);
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
 	}elsif($opt eq "color"){
 		if(!$hash->{IODev}{canConnect}){
@@ -411,7 +423,10 @@ sub TradfriDevice_Attr(@) {
                   Turn the device off.</li>
               <li><i>dimvalue</i><br>
                   Set the brightness of the device.<br>
-                  You need to specify the brightness value as an integer between 0 and 254.<br>
+                  You need to specify the brightness value as an integer between 0 and 100/254.<br>
+                  The largest value depends on the attribute "usePercentDimming".<br>
+                  If this attribute is set, the largest value will be 100.<br>
+                  By default, it isn't set, so the largest value is 254.<br>
                   A brightness value of 0 turns the device off.<br>
                   If the device is off, and you set a value greater than 0, it will turn on.</li>
               <li><i>color</i>
@@ -490,7 +505,7 @@ sub TradfriDevice_Attr(@) {
 					</ul>
                   </li>
               <li><i>updateInfo</i><br>
-                  Update the readings createdAt, dimvalue, manufacturer, name, softwareVersion, state, reachableState, lastSeen and type according to the above described values.</li>
+                  Update the readings color, createdAt, dimvalue, manufacturer, name, softwareVersion, state, reachableState, lastSeen and type according to the above described values.</li>
         </ul>
     </ul>
     <br>
@@ -506,8 +521,14 @@ sub TradfriDevice_Attr(@) {
         Attributes:
         <ul>
             <li><i>autoUpdateInterval</i> <time-seconds><br>
-            	If this value is not 0 or undefined, the readings createdAt, dimvalue, manufacturer, name, softwareVersion, state and type will be updated automatically.<br>
+            	If this value is not 0 or undefined, the readings readings color, createdAt, dimvalue, manufacturer, name, softwareVersion, state, reachableState, lastSeen and type will be updated automatically.<br>
             	The value is the duration between the updates, in seconds.
+            </li>
+            <li><i>usePercentDimming</i> 0/1<br>
+            	If this attribute is one, the largest value for "set dimvalue" will be 100.<br>
+            	Otherwise, the largest value is 254.<br>
+            	This attribute is useful, if you need to control the brightness in percent (0-100%)<br>
+            	For backward compatibility, it is disabled by default, so the largest dimvalue is 254 by default.
             </li>
         </ul>
     </ul>

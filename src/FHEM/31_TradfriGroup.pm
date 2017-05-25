@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.11
+# @version 1.12
 
 package main;
 use strict;
@@ -39,6 +39,7 @@ sub TradfriGroup_Initialize($) {
 
 	$hash->{AttrList} =
 		"autoUpdateInterval "
+		. "usePercentDimming:1,0"
 		. $readingFnAttributes;
 }
 
@@ -151,6 +152,9 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $dimvalue = TradfriLib::getGroupBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo);
+
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+
 		readingsSingleUpdate($hash, 'dimvalue', $dimvalue, 1);
 		return $dimvalue;
 	}elsif($opt eq 'state'){
@@ -212,6 +216,7 @@ sub TradfriGroup_Get($@) {
 		my $memberArray = TradfriLib::getGroupMembers($jsonGroupInfo);
 		my $members = join(' ', @{$memberArray});
 		my $dimvalue = TradfriLib::getGroupBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo);
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 		my $state = TradfriLib::getGroupOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo) ? 'on':'off';
 
 		readingsBeginUpdate($hash);
@@ -240,7 +245,10 @@ sub TradfriGroup_Set($@) {
 	if(!defined($TradfriGroup_sets{$opt})) {
 		my @cList = keys %TradfriGroup_sets;
 		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
-		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,254 off on";
+		my $dimvalueMax = 254;
+		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+
+		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on";
 	}
 	
 	$hash->{STATE} = $TradfriGroup_sets{$opt} = $value;
@@ -262,7 +270,11 @@ sub TradfriGroup_Set($@) {
 			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
 		}
 		return '"set TradfriGroup dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
-		TradfriLib::groupSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, int($value));
+
+		my $dimvalue = int($value);
+		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+
+		TradfriLib::groupSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, $dimvalue);
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
 	}
 
@@ -337,7 +349,10 @@ sub TradfriGroup_Attr(@) {
                   Turn all devices in the group off.</li>
               <li><i>dimvalue</i><br>
                   Set the brightness of all devices in the group.<br>
-                  You need to specify the brightness value as an integer between 0 and 254.<br>
+                  You need to specify the brightness value as an integer between 0 and 100/254.<br>
+                  The largest value depends on the attribute "usePercentDimming".<br>
+                  If this attribute is set, the largest value will be 100.<br>
+                  By default, it isn't set, so the largest value is 254.<br>
                   A brightness value of 0 turns the devices off.<br>
                   If the devices are off, and you set a value greater than 0, they'll turn on.</li>
         </ul>
@@ -375,7 +390,7 @@ sub TradfriGroup_Attr(@) {
                   It is "on", if at least one of the member devices is on<br>
                   Additionally, the reading "state" gets set to the resulting value.</li>
               <li><i>updateInfo</i><br>
-                  Update the readings createdAt, dimvalue, members, name, state according to the above described values.</li>
+                  Update the readings createdAt, dimvalue, members, name and state according to the above described values.</li>
         </ul>
     </ul>
     <br>
@@ -391,8 +406,14 @@ sub TradfriGroup_Attr(@) {
         Attributes:
         <ul>
             <li><i>autoUpdateInterval</i> <time-seconds><br>
-            	If this value is not 0 or undefined, the readings createdAt, dimvalue, members, name, state will be updated automatically.<br>
+            	If this value is not 0 or undefined, the readings createdAt, dimvalue, members, name and state will be updated automatically.<br>
             	The value is the duration between the updates, in seconds.
+            </li>
+            <li><i>usePercentDimming</i> 0/1<br>
+            	If this attribute is one, the largest value for "set dimvalue" will be 100.<br>
+            	Otherwise, the largest value is 254.<br>
+            	This attribute is useful, if you need to control the brightness in percent (0-100%)<br>
+            	For backward compatibility, it is disabled by default, so the largest dimvalue is 254 by default.
             </li>
         </ul>
     </ul>
