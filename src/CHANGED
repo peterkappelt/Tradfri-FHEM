@@ -1,3 +1,7 @@
+- 2.7.2017 (1.14)
+  - feature:    31_TradfriGroup: read all available moods
+  - feature:    31_TradfriGroup: set the mood
+
 - 2.7.2017 (1.13)
   - feature:    30_TradfriGateay: FHEM commandref
   - bugfix:     31_TradfriDevice: not creating tmp-file anymore

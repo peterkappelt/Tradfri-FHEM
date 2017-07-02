@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.12
+# @version 1.14
 
 package TradfriLib;
 use strict;
@@ -10,6 +10,7 @@ use Data::Dumper;
 use constant{
 	PATH_DEVICE_ROOT =>		'15001',
 	PATH_GROUP_ROOT =>		'15004',
+	PATH_MOODS_ROOT =>		'15005',
 };
 
 sub coapCommand{
@@ -36,6 +37,8 @@ sub coapCommand{
 		my $jsonData = JSON->new->utf8->encode(\%data);
 		$coapClientCMD = "echo '$jsonData' | " . $coapClientCMD . " -f -";
 	}
+
+	$coapClientCMD = $coapClientCMD . " 2>/dev/null";
 
 	my $return = `$coapClientCMD`;
 
@@ -234,6 +237,31 @@ sub getGroupCreatedAt{
 	return $_[0]->{9002};
 }
 
+#this returns the mood ids, that are configured for a certain group on the gateway
+#it is an array, with one group id per element
+#first arg: gateway address
+#second arg: gateway secret
+#third arg: group id
+sub getMoods{
+	return coapCommand($_[0], $_[1], 'GET', PATH_MOODS_ROOT . "/" . $_[2], {});
+}
+
+#get the JSON hash of a mood's path
+#takes four arguments:
+#first arg: gateway address
+#second arg: gateway secret
+#third arg: group address
+#fourth arg: mood id
+sub getMoodInfo{
+	return coapCommand($_[0], $_[1], 'GET', PATH_MOODS_ROOT . "/" . $_[2] . "/" . $_[3], {});
+}
+
+#get the user defined name of the group
+#you must pass the return code of getMoodInfo as the first argument
+sub getMoodName{
+	return $_[0]->{9001};
+}
+
 # The output of the path PATH_GROUP_ROOT/GROUP_ADDRESS looks like follows (for bulbs, that can not change color)
 #$VAR1 = {
 #          '9003' => 193768,						-> id
@@ -247,7 +275,7 @@ sub getGroupCreatedAt{
 #                                 }
 #                    },
 #          '5851' => 0,								-> dimming value
-#          '9039' => 199947,						
+#          '9039' => 199947,						-> mood id
 #          '5850' => 1,								-> on/off
 #          '9002' => 1492280898,					-> created at
 #          '9001' => 'TRADFRI group'				-> name
@@ -311,6 +339,30 @@ sub getGroupCreatedAt{
 #          '9003' => 65539, 										-> device id
 #          '9054' => 0 												-> OTA update state
 #        }; 
+
+# Moods are defined per Group
+# An array of the mood ids of the group can be accessed under PATH_MOODS_ROOT/GROUP_ADDRESS
+#
+# the individual mood info is accessed under PATH_MOODS_ROOT/GROUP_ADDRESS/MOOD_ID
+# {
+#    "9001":"FOCUS",												-> user name
+#    "9002":1494088485,												-> created at?
+#    "9003":206399,													-> mood id
+#    "9057":2,														
+#    "9068":1,														-> 1 means that mood is predefined by IKEA ?
+#    "15013":[														-> configs for individual member devices
+#       {
+#          "5850":1,												-> on/ off
+#          "5851":254,												-> dimvalue
+#          "9003":65537												-> member id
+#       },
+#       {
+#          "5850":1,
+#          "5851":254,
+#          "9003":65538
+#       }
+#    ]
+# }
 
 #turn a lamp on or off
 #this requires two arguments: the lamp address and the on/off state (as 0 or 1)
@@ -414,6 +466,20 @@ sub groupSetBrightness{
 		#caution: we need an hash reference here, so it must be defined with $
 		my $command = {
 			'5851' => $brightness
+		};
+
+		coapCommand($_[0], $_[1], 'PUT', PATH_GROUP_ROOT . "/$groupAddress", $command);
+}
+
+#set a preconfigured mood for the group
+#this requires two arguments: the group address and the mood id
+sub groupSetMood{
+		my $groupAddress = $_[2];
+		my $moodID = $_[3];
+
+		#caution: we need an hash reference here, so it must be defined with $
+		my $command = {
+			'9039' => $moodID
 		};
 
 		coapCommand($_[0], $_[1], 'PUT', PATH_GROUP_ROOT . "/$groupAddress", $command);

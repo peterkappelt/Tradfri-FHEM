@@ -56,21 +56,27 @@ Please note, that this module is still in development and there will be new func
 | Get brightness | X | X |
 | Update brightness periodically | X | X |
 | Update brightness in realtime |||
-| Set the color temperature | X ||
-| Get the color temperature | X ||
-| Update the color periodically | X ||
-| Update the color in realtime |||
+| Set the color temperature | X |--|
+| Get the color temperature | X |--|
+| Update the color periodically | X |--|
+| Update the color in realtime ||--|
+| Set the mood |--|X|
+| Get the mood |--||
+| Get information about a mood |--||
+| Update the mood periodically |--||
+| Update the mood in realtime |--||
 
 Additional features:
 * Get information about a bulb, e.g. firmware version, type and reachable state
 * Get the IDs of all devices that are connected to the gateway
 * Get the IDs of all groups that are configured in the gateway
+* Get the IDs of all moods that are configured for a group
 
 ...and some more features, that aren't listed here (but in the FHEM command reference)
 ## What this module can not do
 These points will be implemented later:
-* Pair new devices
-* Moods for groups. Currently, they can't be set, nor read, changed, added.
+* Pair new devices, set group memberships
+* Moods can't be modified, added
 
 ## Getting started
 You need to do as follows in order to control a bulb:

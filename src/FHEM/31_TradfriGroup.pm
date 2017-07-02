@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.13
+# @version 1.14
 
 package main;
 use strict;
@@ -15,6 +15,7 @@ my %TradfriGroup_gets = (
 	'dimvalue'		=> ' ',
 	'state'			=> ' ',
 	'name'			=> ' ',
+	'moods'			=> ' ',
 	'createdAt'		=> ' ',
 	'updateInfo'	=> ' ',
 );
@@ -23,6 +24,7 @@ my %TradfriGroup_sets = (
 	'on'		=> '',
 	'off'		=> '',	
 	'dimvalue'	=> '',
+	'mood'		=> '',
 );
 
 sub TradfriGroup_Initialize($) {
@@ -199,6 +201,40 @@ sub TradfriGroup_Get($@) {
 		my $createdAt = FmtDateTimeRFC1123(TradfriLib::getGroupCreatedAt($jsonGroupInfo));
 		readingsSingleUpdate($hash, 'createdAt', $createdAt, 1);
 		return $createdAt;
+	}elsif($opt eq 'moods'){
+		#check, whether we can connect to the gateway
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+
+		my $moodIDList = TradfriLib::getMoods($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
+
+		if($moodIDList ~~ undef){
+			return "Error while fetching moods!";
+		}
+
+		my $returnUserString = "";
+		my $returnReadingString = "";
+
+		for(my $i = 0; $i < scalar(@{$moodIDList}); $i++){
+			my $moodInfo = TradfriLib::getMoodInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, ${$moodIDList}[$i]);
+
+			$returnUserString .= "- " .
+				${$moodIDList}[$i] .
+				": " .
+				TradfriLib::getMoodName($moodInfo) . 
+				"\n";
+
+			$returnReadingString .= 	${$moodIDList}[$i] .
+										"//" .
+										TradfriLib::getMoodName($moodInfo) .
+										" "
+
+		}
+
+		readingsSingleUpdate($hash, 'moods', $returnReadingString, 1);
+
+		return $returnUserString;
 	}elsif($opt eq 'updateInfo'){
 		#update the following readings: createdAt, state, name, dimvalue, groupMembers
 		#check, whether we can connect to the gateway
@@ -248,7 +284,7 @@ sub TradfriGroup_Set($@) {
 		my $dimvalueMax = 254;
 		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on";
+		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood";
 	}
 	
 	$hash->{STATE} = $TradfriGroup_sets{$opt} = $value;
@@ -276,6 +312,14 @@ sub TradfriGroup_Set($@) {
 
 		TradfriLib::groupSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, $dimvalue);
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
+	}elsif($opt eq "mood"){
+		if(!$hash->{IODev}{canConnect}){
+			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		}
+		return '"set TradfriGroup mood" requires a mood ID. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
+
+		TradfriLib::groupSetMood($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, int($value));
+		readingsSingleUpdate($hash, 'mood', int($value), 1);
 	}
 
 	return undef;
@@ -355,6 +399,11 @@ sub TradfriGroup_Attr(@) {
                   By default, it isn't set, so the largest value is 254.<br>
                   A brightness value of 0 turns the devices off.<br>
                   If the devices are off, and you set a value greater than 0, they'll turn on.</li>
+              <li><i>mood</i><br>
+                  Set the mood of the group.<br>
+                  Moods are preconfigured color temperatures, brightnesses and states for each device of the group<br>
+                  In order to set the mood, you need a mood ID.<br>
+                  You can list the moods that are available for this group by running "get moods"</li>
         </ul>
     </ul>
     <br>
@@ -372,23 +421,27 @@ sub TradfriGroup_Attr(@) {
         <ul>
               <li><i>createdAt</i><br>
                   Get the date and the time, when the group was created.<br>
-                  Additionally, the reading "createdAt" gets set to the resulting value.</li>
+                  Additionally, the reading "createdAt" is set to the resulting value.</li>
               <li><i>dimvalue</i><br>
                   Get the brightness value of the group<br>
                   If the member devices are set to different brightnesses, this will return the mean of the member brightnesses<br>
-                  Additionally, the reading "dimvalue" gets set to the resulting value.</li>
+                  Additionally, the reading "dimvalue" is set to the resulting value.</li>
               <li><i>groupInfo</i><br>
                   The RAW JSON-formatted data, that was returned from the group info. Just for development and/ or additional info</li>
         	  <li><i>groupMembers</i><br>
                   Returns a list of member device IDs, there name and type.<br>
-                  Additionally, the reading "members" gets set to a space-seperated list of the member's device IDs</li>
+                  Additionally, the reading "members" is set to a space-seperated list of the member's device IDs</li>
+               <li><i>moods</i><br>
+                  Get all moods (their name and their ID) that are configured for this group<br>
+                  Please note, that the mood IDs may differ between different groups (though they are the same moods) -> check them for each group
+                  Additionally, the reading "moods" is set to a list of available moods.</li>
               <li><i>name</i><br>
                   Get user defined name of the group<br>
-                  Additionally, the reading "name" gets set to the resulting value.</li>
+                  Additionally, the reading "name" is set to the resulting value.</li>
               <li><i>state</i><br>
                   Get the state (-> on/off) of the group<br>
                   It is "on", if at least one of the member devices is on<br>
-                  Additionally, the reading "state" gets set to the resulting value.</li>
+                  Additionally, the reading "state" is set to the resulting value.</li>
               <li><i>updateInfo</i><br>
                   Update the readings createdAt, dimvalue, members, name and state according to the above described values.</li>
         </ul>
