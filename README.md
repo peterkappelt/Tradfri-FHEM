@@ -14,6 +14,11 @@ Since there is no documentation yet, FHEM might throw some errors during update.
 
 ## Prerequisites
 
+**Summary:**
+* Perl JSON packages (JSON.pm), on my setups they can be installed by running `sudo apt-get install libjson-perl`
+* libcoap, and its binary coap-client
+* IKEA devices: a gateway, a bulb and a remote control/ dimmer
+
 You need to have an IKEA Trådfri Bulb or Panel, a Control-Device (e.g. the Dimmer) and the Gateway.  
 The gateway has to be set-up with the App, the control device and the bulbs need to be paired.  
 __Caution__: Do not make the same mistake I've made. You can __not__ just buy a bulb and a gateway. You need a control device, like the round dimmer, too!
@@ -65,13 +70,14 @@ Additional features:
 ## What this module can not do
 These points will be implemented later:
 * Pair new devices
-* Read information from the bulb, like the current brightness, and react to it
+* Moods for groups. Currently, they can't be set, nor read, changed, added.
 
 ## Getting started
 You need to do as follows in order to control a bulb:
 ### 1. Declare the Gateway-Connection
 
-* Define a new device in you FHEM setup: `define TradfriGW TradfriGateway <Gateway-IP> <Gateway-Secret-Key>`.  
+* Define a new device in you FHEM setup: `define TradfriGW TradfriGateway <Gateway-IP> <Gateway-Secret-Key>`.
+* Don't forget to install the Perl JSON packages (JSON.pm). See "Prerequisites" for a hint how I've installed them.
 * You can use the gateway's IP address or its DNS name
 * You can find the Secret Key on the bottom side of your gateway. It is marked as the "Security Code".
 * Save your config by running the `save` command in FHEM 
@@ -126,4 +132,5 @@ https://community.home-assistant.io/t/ikea-tradfri-gateway-zigbee/14788/18
 
 ## Contact me
 
-Feel free to send me an email, if you've any questions or problems: <kappelt.peter@gmail.com>
+If you've a github account: please open an issue, with the appropriate description of your problem.
+You may send me an email, though issues are prefered: <kappelt.peter@gmail.com>

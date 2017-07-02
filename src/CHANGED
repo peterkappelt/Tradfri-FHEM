@@ -1,3 +1,9 @@
+- 2.7.2017 (1.13)
+  - feature:    30_TradfriGateay: FHEM commandref
+  - bugfix:     31_TradfriDevice: not creating tmp-file anymore
+  - bugfix:     31_TradfriGroup: not creating tmp-file anymore
+  - bugfix:     31_Tradfri*: smaller improvements
+
 - 25.5.2017 (1.12)
   - feature:    31_TradfriDevice: attr "usePercentDimming"
   - feature:    31_TradfriGroup: attr "usePercentDimming"

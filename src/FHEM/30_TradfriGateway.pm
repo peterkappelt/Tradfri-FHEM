@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.12
+# @version 1.13
 
 package main;
 use strict;
@@ -67,7 +67,11 @@ sub TradfriGateway_Define($$) {
 		$ENV{PATH}="$ENV{PATH}:" . $param[4];
 	}
 
-	checkCoapClient($hash);
+	$hash->{STATE} = "INITIALIZED";
+
+	if(checkCoapClient($hash) ne "UNKNOWN"){
+		$hash->{STATE} = "IDLE";
+	}
 
 	return undef;
 }
@@ -178,3 +182,97 @@ sub TradfriGateway_Attr(@) {
 }
 
 1;
+
+=pod
+
+=item device
+=item summary connects with an IKEA Trådfri gateway 
+=item summary_DE stellt die Verbindung mit einem IKEA Trådfri Gateway her
+
+=begin html
+
+<a name="TradfriGateway"></a>
+<h3>TradfriGateway</h3>
+<ul>
+    <i>TradfriGateway</i> stores the connection data for an IKEA Trådfri gateway. It is necessary for TradfriDevice and TradfriGroup
+    <br><br>
+    <a name="TradfriGatewaydefine"></a>
+    <b>Define</b>
+    <ul>
+        <code>define &lt;name&gt; TradfriGateway &lt;gateway-ip&gt; &lt;gateway-secret&gt; [&lt;coap-client-path&gt;]</code>
+        <br><br>
+        Example: <code>define trGateway TradfriGateway TradfriGW.int.kappelt.net vBkxxxxxxxxxx7hz</code>
+        <br><br>
+        The IP can either be a "normal" IP-Address, like 192.168.2.60, or a DNS name (like shown above).<br>
+        You can find the secret on a label on the bottom side of the gateway.
+        The parameter "coap-client-path" is only necessary, if the module cannot find the coap-client you've installed before.
+        See the github page (<a href="https://github.com/peterkappelt/Tradfri-FHEM#debugging-get-coapclientversion--unknown">
+        									https://github.com/peterkappelt/Tradfri-FHEM#debugging-get-coapclientversion--unknown
+        									</a>) for further information.<br>
+		<br>
+        In order to define a gateway and connect to it, you need to install the software "coap-client" on your system. See <a href="https://github.com/peterkappelt/Tradfri-FHEM#prerequisites">
+        									https://github.com/peterkappelt/Tradfri-FHEM#prerequisites
+        									</a>
+    </ul>
+    <br>
+    
+    <a name="TradfriGatewayset"></a>
+    <b>Set</b><br>
+    <ul>
+        <code>set &lt;name&gt; &lt;option&gt; [&lt;value&gt;]</code>
+        <br><br>
+        You can set the following options. See <a href="http://fhem.de/commandref.html#set">commandref#set</a> 
+        for more info about the set command.
+        <br><br>
+        Options:
+        <ul>
+              <li><i></i><br>
+                  There are not sets implemented.</li>
+        </ul>
+    </ul>
+    <br>
+
+    <a name="TradfriGatewayget"></a>
+    <b>Get</b><br>
+    <ul>
+        <code>get &lt;name&gt; &lt;option&gt;</code>
+        <br><br>
+        You can get the following information about the device. See 
+        <a href="http://fhem.de/commandref.html#get">commandref#get</a> for more info about 
+        the get command.
+		<br><br>
+        Options:
+        <ul>
+              <li><i>coapClientVersion</i><br>
+                  Get the version of the coap-client. If this command returns "UNKNOWN", the coap-client command can't be called.<br>
+                  If coap-client was executed, it'll return the version string and set the reading "coapClientVersion" to the value.</li>
+              <li><i>deviceList</i><br>
+                  Returns a list of all devices, that are paired with the gateway.<br>
+                  The list contains the device's address, its type and the name that was set by the user.</li>
+              <li><i>groupList</i><br>
+                  Returns a list of all groups, that are configured in the gateway.<br>
+                  The list contains the group's address and its name.</li>
+        </ul>
+    </ul>
+    <br>
+    
+    <a name="TradfriGatewayattr"></a>
+    <b>Attributes</b>
+    <ul>
+        <code>attr &lt;name&gt; &lt;attribute&gt; &lt;value&gt;</code>
+        <br><br>
+        See <a href="http://fhem.de/commandref.html#attr">commandref#attr</a> for more info about 
+        the attr command.
+        <br><br>
+        Attributes:
+        <ul>
+            <li><i></i><br>
+            	There are no custom attributes implemented
+            </li>
+        </ul>
+    </ul>
+</ul>
+
+=end html
+
+=cut
