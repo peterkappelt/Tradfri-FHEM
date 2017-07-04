@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.14
+# @version 1.15
 
 package main;
 use strict;
@@ -26,6 +26,9 @@ my %TradfriGroup_sets = (
 	'dimvalue'	=> '',
 	'mood'		=> '',
 );
+
+#this hash will be filled with known moods, in the form 'moodname' => mood-id
+my %moodsKnown = ();
 
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
@@ -57,6 +60,8 @@ sub TradfriGroup_Define($$) {
 	$hash->{groupAddress} = $param[2];
 
 	AssignIoPort($hash);
+
+	TradfriGroup_Get($hash, $hash->{name}, 'moods');
 
 	#my $autoUpdateInterval = AttrVal($hash->{name}, 'autoUpdateInterval', 0);
 	#InternalTimer(gettimeofday()+$autoUpdateInterval, "TradfriGroup_GetUpdate", $hash) unless ($autoUpdateInterval == 0);
@@ -215,21 +220,27 @@ sub TradfriGroup_Get($@) {
 
 		my $returnUserString = "";
 		my $returnReadingString = "";
+		%moodsKnown = ();
 
 		for(my $i = 0; $i < scalar(@{$moodIDList}); $i++){
 			my $moodInfo = TradfriLib::getMoodInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, ${$moodIDList}[$i]);
 
+			#remove whitespaces in mood names
+			my $moodName = TradfriLib::getMoodName($moodInfo);
+			$moodName =~ s/\s//;
+
 			$returnUserString .= "- " .
 				${$moodIDList}[$i] .
 				": " .
-				TradfriLib::getMoodName($moodInfo) . 
+				$moodName . 
 				"\n";
 
 			$returnReadingString .= 	${$moodIDList}[$i] .
 										"//" .
-										TradfriLib::getMoodName($moodInfo) .
-										" "
+										$moodName .
+										" ";
 
+			$moodsKnown{"$moodName"} = int(${$moodIDList}[$i]);
 		}
 
 		readingsSingleUpdate($hash, 'moods', $returnReadingString, 1);
@@ -281,10 +292,15 @@ sub TradfriGroup_Set($@) {
 	if(!defined($TradfriGroup_sets{$opt})) {
 		my @cList = keys %TradfriGroup_sets;
 		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
+
+		#dynamic option: max dimvalue
 		my $dimvalueMax = 254;
 		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood";
+		#dynamic option: moods
+		my $moodsList = join(",", map { "$_" } keys %moodsKnown);
+
+		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood:$moodsList";
 	}
 	
 	$hash->{STATE} = $TradfriGroup_sets{$opt} = $value;
@@ -316,7 +332,22 @@ sub TradfriGroup_Set($@) {
 		if(!$hash->{IODev}{canConnect}){
 			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
 		}
-		return '"set TradfriGroup mood" requires a mood ID. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
+		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
+
+		if(!($value =~ /[1-9]+/)){
+			#user wrote a string -> a mood name
+			if(exists($moodsKnown{"$value"})){
+				$value = $moodsKnown{"$value"};
+			}else{
+				#try to update the list of known moods -> maybe it is a new mood and the list isn't updated yet
+				TradfriGroup_Get($hash, $hash->{name}, 'moods');
+				if(exists($moodsKnown{"$value"})){
+					$value = $moodsKnown{"$value"};
+				}else{
+					return "Unknown mood!";
+				}
+			}
+		}
 
 		TradfriLib::groupSetMood($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, int($value));
 		readingsSingleUpdate($hash, 'mood', int($value), 1);
@@ -402,8 +433,12 @@ sub TradfriGroup_Attr(@) {
               <li><i>mood</i><br>
                   Set the mood of the group.<br>
                   Moods are preconfigured color temperatures, brightnesses and states for each device of the group<br>
-                  In order to set the mood, you need a mood ID.<br>
-                  You can list the moods that are available for this group by running "get moods"</li>
+                  In order to set the mood, you need a mood ID or the mood's name.<br>
+                  You can list the moods that are available for this group by running "get moods".<br>
+                  Note, that the mood's name isn't necessarily the same that you've defined in the IKEA app.
+                  This module is currently unable to handle whitespaces in mood names, so whitespaces get removed internally.
+                  Check the reading "moods" after running "get moods" in order to get the names, that you may use with this module.<br>
+                  Mood names are case-sensitive. Mood names, that are only made out of numbers are not supported.</li>
         </ul>
     </ul>
     <br>

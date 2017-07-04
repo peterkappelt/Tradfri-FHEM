@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.14
+# @version 1.15
 
 package TradfriLib;
 use strict;
@@ -477,9 +477,13 @@ sub groupSetMood{
 		my $groupAddress = $_[2];
 		my $moodID = $_[3];
 
+		# @ToDo -> the group needs to be turned on, only setting the mood doesn't turn them on.
+		# check, whether the IKEA App does it the same way (->wireshark capture)
+
 		#caution: we need an hash reference here, so it must be defined with $
 		my $command = {
-			'9039' => $moodID
+			'9039' => $moodID,
+			'5850' => 1,
 		};
 
 		coapCommand($_[0], $_[1], 'PUT', PATH_GROUP_ROOT . "/$groupAddress", $command);

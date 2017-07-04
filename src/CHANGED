@@ -1,3 +1,7 @@
+- 4.7.2017 (1.15)
+  - feature:    31_TradfriGroup: set the mood by name
+  - bugfix:     31_TradfriGroup: setting mood didn't turn devices on
+
 - 2.7.2017 (1.14)
   - feature:    31_TradfriGroup: read all available moods
   - feature:    31_TradfriGroup: set the mood

@@ -136,6 +136,13 @@ If you managed to kill this module, fell free to contact me (with your log, you 
 I'd like to thank the guys from the home-assistant.io community, they already did some reverse-engineering of the protocol, which helped me implementing the protocol.   
 https://community.home-assistant.io/t/ikea-tradfri-gateway-zigbee/14788/18
 
+## Manual
+
+This manual, in its up-to-date version, for this module, and a translation, is available on my website.
+See <http://electronic.kappelt.net/wordpress/en/ikea-tradfri-module-for-fhem/> (English) oder
+<http://electronic.kappelt.net/wordpress/de/ikea-tradfri-module-for-fhem/> (Deutsch).
+You may also leave a comment there. A FAQ page will be created soon.
+
 ## Contact me
 
 If you've a github account: please open an issue, with the appropriate description of your problem.
