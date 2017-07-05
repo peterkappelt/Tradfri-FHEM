@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.15
+# @version 1.16
 
 package main;
 use strict;
@@ -44,7 +44,7 @@ sub TradfriGroup_Initialize($) {
 
 	$hash->{AttrList} =
 		"autoUpdateInterval "
-		. "usePercentDimming:1,0"
+		. "usePercentDimming:1,0 "
 		. $readingFnAttributes;
 }
 
@@ -104,7 +104,7 @@ sub TradfriGroup_Get($@) {
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
 
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
@@ -116,7 +116,7 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
@@ -129,7 +129,7 @@ sub TradfriGroup_Get($@) {
 
 			$returnString .= '- ' . ${$memberArray}[$i] . ': ';
 
-			if($currentDeviceInfo ~~ undef){
+			if(!defined($currentDeviceInfo)){
 				$returnString .= 'Unknown';
 			}else{
 				$returnString .= TradfriLib::getDeviceManufacturer($currentDeviceInfo) .
@@ -154,7 +154,7 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
@@ -171,7 +171,7 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
@@ -185,7 +185,7 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
@@ -199,7 +199,7 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
@@ -214,7 +214,7 @@ sub TradfriGroup_Get($@) {
 
 		my $moodIDList = TradfriLib::getMoods($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
 
-		if($moodIDList ~~ undef){
+		if(!defined($moodIDList)){
 			return "Error while fetching moods!";
 		}
 
@@ -254,7 +254,7 @@ sub TradfriGroup_Get($@) {
 		}
 
 		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if($jsonGroupInfo ~~ undef){
+		if(!defined($jsonGroupInfo)){
 			return "Error while fetching group info!";
 		}
 
