@@ -2,6 +2,10 @@
 
 This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
 
+## About this branch (cf-dev)
+
+This branch is used to evaluate other options for CoAP clients, here Eclipse Californium. It is one step into the direction of realtime updating of the device parameters.
+
 ## Install to FHEM
 Run the following commands to add this repository to your FHEM setup:
 ```
