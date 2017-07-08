@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.15
+# @version 1.16
 
 package main;
 use strict;
@@ -45,7 +45,7 @@ sub TradfriDevice_Initialize($) {
 
 	$hash->{AttrList} =
 		"autoUpdateInterval "
-		. "usePercentDimming:1,0"
+		. "usePercentDimming:1,0 "
 		. $readingFnAttributes;
 }
 
@@ -99,7 +99,7 @@ sub TradfriDevice_Get($@) {
 		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -110,7 +110,7 @@ sub TradfriDevice_Get($@) {
 		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -124,7 +124,7 @@ sub TradfriDevice_Get($@) {
 		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -138,7 +138,7 @@ sub TradfriDevice_Get($@) {
 		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -154,7 +154,7 @@ sub TradfriDevice_Get($@) {
 		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -168,7 +168,7 @@ sub TradfriDevice_Get($@) {
 		}
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
 		
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -183,7 +183,7 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -197,7 +197,7 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -211,7 +211,7 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -225,7 +225,7 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -239,7 +239,7 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 
@@ -253,7 +253,7 @@ sub TradfriDevice_Get($@) {
 		}
 
 		my $jsonDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress});
-		if($jsonDeviceInfo ~~ undef){
+		if(!defined($jsonDeviceInfo)){
 			return "Error while fetching device info!";
 		}
 

@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.15
+# @version 1.16
 
 package main;
 use strict;
@@ -97,7 +97,7 @@ sub TradfriGateway_Get($@) {
 	if($opt eq 'deviceList'){
 		my $deviceIDList = TradfriLib::getDevices($hash->{gatewayAddress}, $hash->{gatewaySecret});
 			
-		if($deviceIDList ~~ undef){
+		if(!defined($deviceIDList)){
 			return "Error while trying to fetch devices!";
 		}
 
@@ -121,7 +121,7 @@ sub TradfriGateway_Get($@) {
 	}elsif($opt eq 'groupList'){
 		my $groupIDList = TradfriLib::getGroups($hash->{gatewayAddress}, $hash->{gatewaySecret});
 
-		if($groupIDList ~~ undef){
+		if(!defined($groupIDList)){
 			return "Error while fetching groups!";
 		}
 
