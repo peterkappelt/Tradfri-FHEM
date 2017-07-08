@@ -6,6 +6,8 @@ This is a small extension module for the FHEM Home-Control software. It enables 
 
 This branch is used to evaluate other options for CoAP clients, here Eclipse Californium. It is one step into the direction of realtime updating of the device parameters.
 
+__Caution:__ The information down below might __not__ be up to date, it'll be updated later.
+
 ## Install to FHEM
 Run the following commands to add this repository to your FHEM setup:
 ```

@@ -1,11 +1,13 @@
 # @author Peter Kappelt
-# @version 1.16
+# @version 1.16.dev-cf.1
 
 package main;
 use strict;
 use warnings;
 
 use TradfriLib;
+
+require 'DevIo.pm';
 
 my %TradfriGateway_sets = (
 	"ToBeDone"	=> ' ',
@@ -15,6 +17,7 @@ my %TradfriGateway_gets = (
 	'deviceList'	=> ' ',
 	'groupList'		=> ' ',
 	'coapClientVersion'		=> ' ',
+	'lmpOn'			=> ' ',
 );
 
 sub checkCoapClient{
@@ -55,11 +58,17 @@ sub TradfriGateway_Define($$) {
 	if(int(@param) < 4) {
 		return "too few parameters: define <name> TradfriGateway <gateway-ip> <gateway-secret> [<coap-client-directory>]";
 	}
+
+	#close connection to socket, if open
+	DevIo_CloseDev($hash);
 	
 	$hash->{name}  = $param[0];
 
 	$hash->{gatewayAddress} = $param[2];
 	$hash->{gatewaySecret} = $param[3];
+
+	# @todo make user settable
+	$hash->{DeviceName} = "localhost:505";
 
 	if(int(@param) > 4){
 		#there was a fifth parameter
@@ -73,6 +82,13 @@ sub TradfriGateway_Define($$) {
 		$hash->{STATE} = "IDLE";
 	}
 
+	#open the socket connection
+	#@todo react to return code
+	my $ret = DevIo_OpenDev($hash, 0, "TradfriGateway_DeviceInit");
+
+	#set the PSK
+	DevIo_SimpleWrite($hash, "setPSK|temp|" . $hash->{gatewaySecret} . "\n", 2, 0);
+
 	return undef;
 }
 
@@ -80,6 +96,10 @@ sub TradfriGateway_Undef($$) {
 	my ($hash, $arg) = @_; 
 	# nothing to do
 	return undef;
+}
+
+sub TradfriGateway_DeviceInit($) {
+  
 }
 
 sub TradfriGateway_Get($@) {
@@ -141,6 +161,8 @@ sub TradfriGateway_Get($@) {
 		return $returnUserString;
 	}elsif($opt eq 'coapClientVersion'){
 		return checkCoapClient($hash);
+	}elsif($opt eq 'lmpOn'){
+		return DevIo_Expect($hash, "coapGet|test|coaps://192.168.2.65/15001/65537\n", 1000);
 	}
 
 	return $TradfriGateway_gets{$opt};
