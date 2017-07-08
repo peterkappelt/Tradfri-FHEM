@@ -143,10 +143,9 @@ https://community.home-assistant.io/t/ikea-tradfri-gateway-zigbee/14788/18
 ## Manual
 
 This manual, in its up-to-date version, for this module, and a translation, is available on my website.
-See <http://electronic.kappelt.net/wordpress/en/ikea-tradfri-module-for-fhem/> (English) or
+See <http://electronic.kappelt.net/wordpress/en/ikea-tradfri-module-for-fhem/> (English) oder
 <http://electronic.kappelt.net/wordpress/de/ikea-tradfri-module-for-fhem/> (Deutsch).
 You may also leave a comment there. A FAQ page will be created soon.
-You can find a thread in the FHEM forum here: <https://forum.fhem.de/index.php/topic,70653.0.html>
 
 ## Contact me
 
