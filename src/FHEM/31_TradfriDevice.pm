@@ -6,6 +6,11 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use JSON;
+
+use constant{
+	PATH_DEVICE_ROOT =>		'/15001',
+};
 
 use TradfriLib;
 
@@ -30,6 +35,85 @@ my %TradfriDevice_sets = (
 	'dimvalue'	=> '',
 	'color'		=> '',
 );
+
+#subs, that define command to control a device
+# cmdSet* functions will return a string, containing the last part of the CoAP path (like /15001/65537) and a string containing the JSON data that shall be written
+
+#get the command and the path to turn the device on or off
+#this requires two arguments: the lamp address and the on/off state (as 0 or 1)
+sub cmdSetOnOff{
+		my $lampAddress = $_[0];
+		my $onOffState = $_[1];
+
+		my $jsonState = $onOffState ? 1:0;
+
+		my $command = {
+				'3311' => [
+						{
+								'5850' => $jsonState
+						}
+				]
+		};
+
+		my $jsonString = JSON->new->utf8->encode($command);
+
+		return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
+}
+
+#get the command and the path to set the device's brightness
+#args:
+# - lamp address
+# - brightness (0 - 254)
+sub cmdSetBrightness{
+		my $lampAddress = $_[0];
+		my $brightness = $_[1];
+
+		if($brightness > 254){
+				$brightness = 254;
+		}
+		if($brightness < 0){
+				$brightness = 0;
+		}
+
+		my $command = {
+				'3311' => [
+						{
+								'5851' => $brightness
+						}
+				]
+		};
+
+		my $jsonString = JSON->new->utf8->encode($command);
+
+		return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
+}
+
+#get the command and the path to set the device's color
+#args:
+#	- the lamp address,
+#	- rgb color string, hexadecimal notation
+#
+# ikea uses the following combinations:
+# F1E0B5 for standard
+# F5FAF6 for cold
+# EFD275 for warm
+sub cmdSetColorRGB{
+	my $lampAddress = $_[0];
+	my $rgb = $_[1];
+
+	#caution: we need an hash reference here, so it must be defined with $
+	my $command = {
+			'3311' => [
+					{
+							'5706' => $rgb,
+					}
+			]
+	};
+
+	my $jsonString = JSON->new->utf8->encode($command);
+
+	return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
+}
 
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
@@ -309,36 +393,35 @@ sub TradfriDevice_Set($@) {
 	$TradfriDevice_sets{$opt} = $value;
 
 	if($opt eq "on"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
+		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'on';
-		TradfriLib::lampSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, 1);
+
+		#@todo reading shouldn't be updated here?
 		readingsSingleUpdate($hash, 'state', 'on', 1);
+
+		my ($coapPath, $coapData) = cmdSetOnOff($hash->{deviceAddress}, 1);
+		return IOWrite($hash, $coapPath, $coapData);
 	}elsif($opt eq "off"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
+		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'off';
-		TradfriLib::lampSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, 0);
+
+		#@todo reading shouldn't be updated here?
 		readingsSingleUpdate($hash, 'state', 'off', 1);
+
+		my ($coapPath, $coapData) = cmdSetOnOff($hash->{deviceAddress}, 0);
+		return IOWrite($hash, $coapPath, $coapData);
 	}elsif($opt eq "dimvalue"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 		
 		my $dimvalue = int($value);
 		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-
-		TradfriLib::lampSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, $dimvalue);
+		#@todo reading shouldn't be updated here?
 		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
-	}elsif($opt eq "color"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
 
+		my ($coapPath, $coapData) = cmdSetBrightness($hash->{deviceAddress}, $dimvalue);
+		return IOWrite($hash, $coapPath, $coapData);
+	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
 		
 		my $rgb;
@@ -352,9 +435,12 @@ sub TradfriDevice_Set($@) {
 		}else{
 			$rgb = $value;
 		}
-		
-		TradfriLib::lampSetColorRGB($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{deviceAddress}, $rgb);
+	
+		#@todo reading shouldn't be updated here?
 		readingsSingleUpdate($hash, 'color', $rgb, 1);
+
+		my ($coapPath, $coapData) = cmdSetColorRGB($hash->{deviceAddress}, $rgb);
+		return IOWrite($hash, $coapPath, $coapData);
 	}
 
 	return undef;

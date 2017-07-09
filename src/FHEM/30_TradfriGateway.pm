@@ -17,7 +17,6 @@ my %TradfriGateway_gets = (
 	'deviceList'	=> ' ',
 	'groupList'		=> ' ',
 	'coapClientVersion'		=> ' ',
-	'lmpOn'			=> ' ',
 );
 
 sub checkCoapClient{
@@ -43,6 +42,7 @@ sub TradfriGateway_Initialize($) {
 	$hash->{GetFn}      = 'TradfriGateway_Get';
 	$hash->{AttrFn}     = 'TradfriGateway_Attr';
 	$hash->{ReadFn}     = 'TradfriGateway_Read';
+	$hash->{WriteFn}	= 'TradfriGateway_Write';
 
 	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
 	$hash->{MatchList} = {
@@ -76,18 +76,18 @@ sub TradfriGateway_Define($$) {
 		$ENV{PATH}="$ENV{PATH}:" . $param[4];
 	}
 
-	$hash->{STATE} = "INITIALIZED";
+	#$hash->{STATE} = "INITIALIZED";
 
-	if(checkCoapClient($hash) ne "UNKNOWN"){
-		$hash->{STATE} = "IDLE";
-	}
+	#if(checkCoapClient($hash) ne "UNKNOWN"){
+	#	$hash->{STATE} = "IDLE";
+	#}
 
 	#open the socket connection
 	#@todo react to return code
 	my $ret = DevIo_OpenDev($hash, 0, "TradfriGateway_DeviceInit");
 
 	#set the PSK
-	DevIo_SimpleWrite($hash, "setPSK|temp|" . $hash->{gatewaySecret} . "\n", 2, 0);
+	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
 
 	return undef;
 }
@@ -101,6 +101,37 @@ sub TradfriGateway_Undef($$) {
 sub TradfriGateway_DeviceInit($) {
   
 }
+
+# a write command, that is dispatch from the logical module to here via IOWrite requires two arguments:
+# 1.: the incomplete coap path, like "/15001/65537". The first part of the path will be handled by this module
+# 2.: the payload data, for Tradfri as as JSON string
+sub TradfriGateway_Write ($$){
+	my ( $hash, @arguments) = @_;
+	
+	if(int(@arguments < 2)){
+		Log(1, "[TradfriGateway] Not enough arguments for IOWrite!");
+		return "Not enough arguments for IOWrite!";
+	}
+	
+	#@todo better check, if opened
+	if($hash->{STATE} != 'opened'){
+		Log(1, "[TradfriGateway] Can't write, connection is not opened!");
+		return "Can't write, connection is not opened!";
+	}
+
+	Log(3, "[TradfriGateway] Write of $arguments[1] to $arguments[0]");
+
+	DevIo_SimpleWrite($hash, "coapPutJSON|coaps://" . $hash->{gatewayAddress} . $arguments[0] . "|" . $arguments[1] . "\n", 2, 0);
+
+	#@todo return code handling
+	return undef;
+}
+
+#data was received on the socket
+sub TradfriGateway_Read ($){
+	my ( $hash ) = @_;
+}
+
 
 sub TradfriGateway_Get($@) {
 	my ($hash, @param) = @_;
@@ -161,8 +192,6 @@ sub TradfriGateway_Get($@) {
 		return $returnUserString;
 	}elsif($opt eq 'coapClientVersion'){
 		return checkCoapClient($hash);
-	}elsif($opt eq 'lmpOn'){
-		return DevIo_Expect($hash, "coapGet|test|coaps://192.168.2.65/15001/65537\n", 1000);
 	}
 
 	return $TradfriGateway_gets{$opt};
