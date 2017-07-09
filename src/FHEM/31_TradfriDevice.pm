@@ -38,6 +38,7 @@ my %TradfriDevice_sets = (
 
 #subs, that define command to control a device
 # cmdSet* functions will return a string, containing the last part of the CoAP path (like /15001/65537) and a string containing the JSON data that shall be written
+# dataGet* functions will return the respective data, they expect a decoded JSON hash with the device information
 
 #get the command and the path to turn the device on or off
 #this requires two arguments: the lamp address and the on/off state (as 0 or 1)
@@ -115,6 +116,71 @@ sub cmdSetColorRGB{
 	return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
 }
 
+
+#get the device typpe
+#pass decoded JSON data of /15001/device-id 
+sub dataGetType{
+	return $_[0]->{3}{1};
+}
+
+#get the device's manufacturer
+#you must pass the return code of getDeviceInfo as the first argument
+sub dataGetManufacturer{
+	return $_[0]->{3}{0};
+}
+
+#get the user defined name of the device
+#pass decoded JSON data of /15001/device-id 
+sub dataGetName{
+	return $_[0]->{9001};
+}
+
+#get the device's brightness
+#pass decoded JSON data of /15001/device-id 
+sub dataGetBrightness{
+	return $_[0]->{3311}[0]->{5851};
+}
+
+#get the device's on/ off state
+#pass decoded JSON data of /15001/device-id 
+sub dataGetOnOff{
+	return $_[0]->{3311}[0]->{5850};
+}
+
+#get the timestamp, when the device was created
+#pass decoded JSON data of /15001/device-id 
+sub dataGetCreatedAt{
+	return $_[0]->{9002};
+}
+
+#get the  software version of the device
+#pass decoded JSON data of /15001/device-id 
+sub dataGetSoftwareVersion{
+	return $_[0]->{3}{3};
+}
+
+#get, whether the device is reachable
+#pass decoded JSON data of /15001/device-id 
+sub dataGetReachabilityState{
+	return $_[0]->{9019};
+}
+
+#get the timestamp, when the device was last seen by the gateway
+#pass decoded JSON data of /15001/device-id 
+sub dataGetLastSeen{
+	return $_[0]->{9020};
+}
+
+#get the device color code
+#if the device cannot change its color, this function returns 0
+#pass decoded JSON data of /15001/device-id 
+sub dataGetColor{
+	if(exists($_[0]->{3311}[0]->{5706})){
+		return $_[0]->{3311}[0]->{5706};
+	}
+	return 0;
+}
+
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
@@ -124,8 +190,9 @@ sub TradfriDevice_Initialize($) {
 	$hash->{GetFn}      = 'TradfriDevice_Get';
 	$hash->{AttrFn}     = 'TradfriDevice_Attr';
 	$hash->{ReadFn}     = 'TradfriDevice_Read';
+	$hash->{ParseFn}	= 'TradfriDevice_Parse';
 
-	$hash->{Match} = ".*";
+	$hash->{Match} = '^observedUpdate\|coaps:\/\/[^\/]*\/15001';
 
 	$hash->{AttrList} =
 		"autoUpdateInterval "
@@ -144,7 +211,13 @@ sub TradfriDevice_Define($$) {
 	$hash->{name}  = $param[0];
 	$hash->{deviceAddress} = $param[2];
 
+	#reverse search, for Parse
+	$modules{TradfriDevice}{defptr}{$hash->{deviceAddress}} = $hash;
+
 	AssignIoPort($hash);
+
+	#start observing the coap resource, so the module will be informed about status updates
+	IOWrite($hash, 'observeStart', PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress}, '');
 
 	return undef;
 }
@@ -152,6 +225,59 @@ sub TradfriDevice_Define($$) {
 sub TradfriDevice_Undef($$) {
 	my ($hash, $arg) = @_; 
 	# nothing to do
+	return undef;
+}
+
+sub TradfriDevice_Parse ($$){
+	my ($io_hash, $message) = @_;
+	
+	#the message contains 'coapObserveStart|coapPath|data' -> split it by the pipe character
+	my @parts = split('\|', $message);
+
+	if(int(@parts) < 3){
+		#expecting at least three parts
+		return undef;
+	}
+
+	#$parts[1], the coapPath is build up like this: coaps://Ip-or-dns-of-gateway/15001/Id-of-device
+	#extract the device id with the following regex:
+	my ($temp, $msgDeviceId) = ($parts[1] =~ /(^coap.?:\/\/[^\/]*\/15001\/)([0-9]*)/);
+
+	#check if device with the id exists
+	if(my $hash = $modules{TradfriDevice}{defptr}{$msgDeviceId}) 
+	{
+		#parse the JSON data
+		my $jsonData = JSON->new->utf8->decode($parts[2]);
+
+		my $manufacturer = dataGetManufacturer($jsonData);
+		my $type = dataGetType($jsonData);
+		my $dimvalue = dataGetBrightness($jsonData);
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+		my $state = dataGetOnOff($jsonData) ? 'on':'off';
+		my $name = dataGetName($jsonData);
+		my $createdAt = FmtDateTimeRFC1123(dataGetCreatedAt($jsonData));
+		my $reachableState = dataGetReachabilityState($jsonData);
+		my $lastSeen = FmtDateTimeRFC1123(dataGetLastSeen($jsonData));
+		my $color = dataGetColor($jsonData);
+		my $version = dataGetSoftwareVersion($jsonData);
+
+		readingsBeginUpdate($hash);
+		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
+		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
+		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
+		readingsBulkUpdateIfChanged($hash, 'softwareVersion', $version, 1);
+		readingsBulkUpdateIfChanged($hash, 'type', $type, 1);
+		readingsBulkUpdateIfChanged($hash, 'manufacturer', $manufacturer, 1);
+		readingsBulkUpdateIfChanged($hash, 'reachableState', $reachableState, 1);
+		readingsBulkUpdateIfChanged($hash, 'color', $color, 1);
+		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
+		readingsEndUpdate($hash, 1);
+		
+		#return the appropriate device's name
+		return $hash->{NAME}; 
+	}
+	
 	return undef;
 }
 
@@ -396,31 +522,22 @@ sub TradfriDevice_Set($@) {
 		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'on';
 
-		#@todo reading shouldn't be updated here?
-		readingsSingleUpdate($hash, 'state', 'on', 1);
-
 		my ($coapPath, $coapData) = cmdSetOnOff($hash->{deviceAddress}, 1);
-		return IOWrite($hash, $coapPath, $coapData);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "off"){
 		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'off';
 
-		#@todo reading shouldn't be updated here?
-		readingsSingleUpdate($hash, 'state', 'off', 1);
-
 		my ($coapPath, $coapData) = cmdSetOnOff($hash->{deviceAddress}, 0);
-		return IOWrite($hash, $coapPath, $coapData);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "dimvalue"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 		
 		my $dimvalue = int($value);
 		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-		#@todo reading shouldn't be updated here?
-		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
-
 		my ($coapPath, $coapData) = cmdSetBrightness($hash->{deviceAddress}, $dimvalue);
-		return IOWrite($hash, $coapPath, $coapData);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
 		
@@ -436,11 +553,8 @@ sub TradfriDevice_Set($@) {
 			$rgb = $value;
 		}
 	
-		#@todo reading shouldn't be updated here?
-		readingsSingleUpdate($hash, 'color', $rgb, 1);
-
 		my ($coapPath, $coapData) = cmdSetColorRGB($hash->{deviceAddress}, $rgb);
-		return IOWrite($hash, $coapPath, $coapData);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}
 
 	return undef;

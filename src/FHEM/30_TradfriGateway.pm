@@ -46,7 +46,7 @@ sub TradfriGateway_Initialize($) {
 
 	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
 	$hash->{MatchList} = {
-			"1:TradfriDevice" => "D.*" ,
+			"1:TradfriDevice" => '^observedUpdate\|coaps:\/\/[^\/]*\/15001',
 			"2:TradfriGroup" => "G.*" ,
 			};
 }
@@ -89,6 +89,10 @@ sub TradfriGateway_Define($$) {
 	#set the PSK
 	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
 
+	#@todo after setting the PSK, the socket is busy re-initializing the stuff
+	#		further commands, like starting observations are ignored
+	sleep(1);
+
 	return undef;
 }
 
@@ -99,7 +103,7 @@ sub TradfriGateway_Undef($$) {
 }
 
 sub TradfriGateway_DeviceInit($) {
-  
+
 }
 
 # a write command, that is dispatch from the logical module to here via IOWrite requires two arguments:
@@ -108,20 +112,24 @@ sub TradfriGateway_DeviceInit($) {
 sub TradfriGateway_Write ($$){
 	my ( $hash, @arguments) = @_;
 	
-	if(int(@arguments < 2)){
+	if(int(@arguments < 3)){
 		Log(1, "[TradfriGateway] Not enough arguments for IOWrite!");
 		return "Not enough arguments for IOWrite!";
 	}
 	
 	#@todo better check, if opened
-	if($hash->{STATE} != 'opened'){
+	if($hash->{STATE} ne 'opened'){
 		Log(1, "[TradfriGateway] Can't write, connection is not opened!");
 		return "Can't write, connection is not opened!";
 	}
 
-	Log(3, "[TradfriGateway] Write of $arguments[1] to $arguments[0]");
-
-	DevIo_SimpleWrite($hash, "coapPutJSON|coaps://" . $hash->{gatewayAddress} . $arguments[0] . "|" . $arguments[1] . "\n", 2, 0);
+	if($arguments[0] eq 'write'){
+		Log(3, "[TradfriGateway] Put of $arguments[2] to $arguments[1]");
+		DevIo_SimpleWrite($hash, "coapPutJSON|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "|" . $arguments[2] . "\n", 2, 0);
+	}elsif($arguments[0] eq 'observeStart'){
+		Log(3, "[TradfriGateway] Start to observe path $arguments[1]");
+		DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 2, 0);
+	}
 
 	#@todo return code handling
 	return undef;
@@ -130,6 +138,26 @@ sub TradfriGateway_Write ($$){
 #data was received on the socket
 sub TradfriGateway_Read ($){
 	my ( $hash ) = @_;
+
+	my $msg = DevIo_SimpleRead($hash);	
+
+	if(!defined($msg)){
+		return undef;
+	}
+
+	my $msgReadableWhitespace = $msg;
+	$msgReadableWhitespace =~ s/\r/\\r/g;
+	$msgReadableWhitespace =~ s/\n/\\n/g;
+	Log(4, "[TradfriGateway] Received message on socket: \"" . $msgReadableWhitespace . "\"");
+
+	#newlines in the message isn't necessary
+	$msg =~ s/\r//g;
+	$msg =~ s/\n//g;
+
+	#dispatch the message if it isn't empty
+	if($msg ne ''){
+		Dispatch($hash, $msg, undef);
+	}
 }
 
 
