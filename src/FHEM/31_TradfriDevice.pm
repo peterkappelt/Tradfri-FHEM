@@ -246,8 +246,17 @@ sub TradfriDevice_Parse ($$){
 	#check if device with the id exists
 	if(my $hash = $modules{TradfriDevice}{defptr}{$msgDeviceId}) 
 	{
+		# the path returned "Not Found" -> unknown resource, but this message still suits for this device
+		if($parts[2] eq "Not Found"){
+			$hash->{STATE} = "NotFound";
+			return $hash->{NAME};
+		}
+
 		#parse the JSON data
-		my $jsonData = JSON->new->utf8->decode($parts[2]);
+		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+		if($@){
+			return undef; #the string was probably not valid JSON
+		}
 
 		my $manufacturer = dataGetManufacturer($jsonData);
 		my $type = dataGetType($jsonData);

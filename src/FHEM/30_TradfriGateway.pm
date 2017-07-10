@@ -90,10 +90,6 @@ sub TradfriGateway_Define($$) {
 	#set the PSK
 	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
 
-	#@todo after setting the PSK, the socket is busy re-initializing the stuff
-	#		further commands, like starting observations are ignored
-	sleep(1);
-
 	return undef;
 }
 
