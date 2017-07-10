@@ -10,7 +10,7 @@ use TradfriLib;
 require 'DevIo.pm';
 
 my %TradfriGateway_sets = (
-	"ToBeDone"	=> ' ',
+	'reopen'	=> ' ',
 );
 
 my %TradfriGateway_gets = (
@@ -43,6 +43,7 @@ sub TradfriGateway_Initialize($) {
 	$hash->{AttrFn}     = 'TradfriGateway_Attr';
 	$hash->{ReadFn}     = 'TradfriGateway_Read';
 	$hash->{WriteFn}	= 'TradfriGateway_Write';
+	$hash->{ReadyFn}	= 'TradfriGateway_Ready';
 
 	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
 	$hash->{MatchList} = {
@@ -160,6 +161,13 @@ sub TradfriGateway_Read ($){
 	}
 }
 
+sub TradfriGateway_Ready($){
+	my ($hash) = @_;
+	#@todo re-set the PSK
+	#@todo re-set observed resources
+	return DevIo_OpenDev($hash, 1, "TradfriGateway_DeviceInit") if($hash->{STATE} eq "disconnected");
+}
+
 
 sub TradfriGateway_Get($@) {
 	my ($hash, @param) = @_;
@@ -238,9 +246,16 @@ sub TradfriGateway_Set($@) {
 		my @cList = keys %TradfriGateway_sets;
 		return "Unknown argument $opt, choose one of " . join(" ", @cList);
 	}
-	$hash->{STATE} = $TradfriGateway_sets{$opt} = $value;
+
+	if($opt eq "reopen"){
+		# @todo re-open the connection
+	}
+
+	#$hash->{STATE} = $TradfriGateway_sets{$opt} = $value;
 	
-	return "$opt set to $value.";
+	return undef;
+
+	#return "$opt set to $value.";
 }
 
 
