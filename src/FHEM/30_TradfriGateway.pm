@@ -87,9 +87,6 @@ sub TradfriGateway_Define($$) {
 	#@todo react to return code
 	my $ret = DevIo_OpenDev($hash, 0, "TradfriGateway_DeviceInit");
 
-	#set the PSK
-	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
-
 	return undef;
 }
 
@@ -99,13 +96,22 @@ sub TradfriGateway_Undef($$) {
 	return undef;
 }
 
-sub TradfriGateway_DeviceInit($) {
+sub TradfriGateway_DeviceInit($){
+	my $hash = shift;
 
+	#@todo restart observing the necessary pathes
+
+	#set the PSK
+	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
 }
 
-# a write command, that is dispatch from the logical module to here via IOWrite requires two arguments:
-# 1.: the incomplete coap path, like "/15001/65537". The first part of the path will be handled by this module
-# 2.: the payload data, for Tradfri as as JSON string
+# a write command, that is dispatch from the logical module to here via IOWrite requires three arguments:
+# 1.: a method for the write command. The following values are allowed:
+#		- 'write' -> CoAP-PUT of specified data to a specified path
+#		- 'observeStart' -> start the observation of a specified path, argument #3 can be an empty string.
+#		- 'get' -> CoAP-GET from a specified path, argument #3 can be an empty string. This call is blocking, the call waits for an answer.
+# 2.: the incomplete coap path, like "/15001/65537". The first part of the path will be handled by this module
+# 3.: the payload data, for Tradfri as as JSON string
 sub TradfriGateway_Write ($$){
 	my ( $hash, @arguments) = @_;
 	
@@ -126,6 +132,9 @@ sub TradfriGateway_Write ($$){
 	}elsif($arguments[0] eq 'observeStart'){
 		Log(3, "[TradfriGateway] Start to observe path $arguments[1]");
 		DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 2, 0);
+	}elsif($arguments[0] eq 'get'){
+		Log(4, "[TradfriGateway] Get from $arguments[1]");
+		return DevIo_Expect($hash, "coapGet|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 1);
 	}
 
 	#@todo return code handling
@@ -163,8 +172,6 @@ sub TradfriGateway_Read ($){
 
 sub TradfriGateway_Ready($){
 	my ($hash) = @_;
-	#@todo re-set the PSK
-	#@todo re-set observed resources
 	return DevIo_OpenDev($hash, 1, "TradfriGateway_DeviceInit") if($hash->{STATE} eq "disconnected");
 }
 
@@ -248,14 +255,13 @@ sub TradfriGateway_Set($@) {
 	}
 
 	if($opt eq "reopen"){
-		# @todo re-open the connection
+		#close connection to socket, if open
+		DevIo_CloseDev($hash);
+		#@todo react to return code
+		my $ret = DevIo_OpenDev($hash, 0, "TradfriGateway_DeviceInit");
 	}
 
-	#$hash->{STATE} = $TradfriGateway_sets{$opt} = $value;
-	
 	return undef;
-
-	#return "$opt set to $value.";
 }
 
 
@@ -320,8 +326,10 @@ sub TradfriGateway_Attr(@) {
         <br><br>
         Options:
         <ul>
-              <li><i></i><br>
-                  There are not sets implemented.</li>
+              <li><i>reopen</i><br>
+                  Re-open the connection to the Java TCP socket, that acts like a "translator" between FHEM and the Tradfri-CoAP-Infrastructure.<br>
+                  If the connection is already opened, it'll be closed and opened.<br>
+                  If the connection isn't open yet, a try to open it will be executed.</li>
         </ul>
     </ul>
     <br>
