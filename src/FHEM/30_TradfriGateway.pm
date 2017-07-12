@@ -147,13 +147,17 @@ sub TradfriGateway_Read ($){
 	$msgReadableWhitespace =~ s/\n/\\n/g;
 	Log(4, "[TradfriGateway] Received message on socket: \"" . $msgReadableWhitespace . "\"");
 
-	#newlines in the message isn't necessary
-	$msg =~ s/\r//g;
-	$msg =~ s/\n//g;
+	#there might be multiple messages at once, they are split by newline. Iterate through each of them
+	my @messagesSingle = split(/\n/, $msg);
+	foreach my $message(@messagesSingle){
+		#if there is whitespace left, remove it.
+		$message =~ s/\r//g;
+		$message =~ s/\n//g;
 
-	#dispatch the message if it isn't empty
-	if($msg ne ''){
-		Dispatch($hash, $msg, undef);
+		#dispatch the message if it isn't empty
+		if($message ne ''){
+			Dispatch($hash, $message, undef);
+		}
 	}
 }
 
