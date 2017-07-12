@@ -37,12 +37,12 @@ my %TradfriDevice_sets = (
 );
 
 #subs, that define command to control a device
-# cmdSet* functions will return a string, containing the last part of the CoAP path (like /15001/65537) and a string containing the JSON data that shall be written
-# dataGet* functions will return the respective data, they expect a decoded JSON hash with the device information
+# cmdSetDevice* functions will return a string, containing the last part of the CoAP path (like /15001/65537) and a string containing the JSON data that shall be written
+# dataGetDevice* functions will return the respective data, they expect a decoded JSON hash with the device information
 
 #get the command and the path to turn the device on or off
 #this requires two arguments: the lamp address and the on/off state (as 0 or 1)
-sub cmdSetOnOff{
+sub cmdSetDeviceOnOff{
 		my $lampAddress = $_[0];
 		my $onOffState = $_[1];
 
@@ -65,7 +65,7 @@ sub cmdSetOnOff{
 #args:
 # - lamp address
 # - brightness (0 - 254)
-sub cmdSetBrightness{
+sub cmdSetDeviceBrightness{
 		my $lampAddress = $_[0];
 		my $brightness = $_[1];
 
@@ -98,7 +98,7 @@ sub cmdSetBrightness{
 # F1E0B5 for standard
 # F5FAF6 for cold
 # EFD275 for warm
-sub cmdSetColorRGB{
+sub cmdSetDeviceColorRGB{
 	my $lampAddress = $_[0];
 	my $rgb = $_[1];
 
@@ -119,62 +119,62 @@ sub cmdSetColorRGB{
 
 #get the device typpe
 #pass decoded JSON data of /15001/device-id 
-sub dataGetType{
+sub dataGetDeviceType{
 	return $_[0]->{3}{1};
 }
 
 #get the device's manufacturer
-#you must pass the return code of getDeviceInfo as the first argument
-sub dataGetManufacturer{
+#pass decoded JSON data of /15001/device-id
+sub dataGetDeviceManufacturer{
 	return $_[0]->{3}{0};
 }
 
 #get the user defined name of the device
 #pass decoded JSON data of /15001/device-id 
-sub dataGetName{
+sub dataGetDeviceName{
 	return $_[0]->{9001};
 }
 
 #get the device's brightness
 #pass decoded JSON data of /15001/device-id 
-sub dataGetBrightness{
+sub dataGetDeviceBrightness{
 	return $_[0]->{3311}[0]->{5851};
 }
 
 #get the device's on/ off state
 #pass decoded JSON data of /15001/device-id 
-sub dataGetOnOff{
+sub dataGetDeviceOnOff{
 	return $_[0]->{3311}[0]->{5850};
 }
 
 #get the timestamp, when the device was created
 #pass decoded JSON data of /15001/device-id 
-sub dataGetCreatedAt{
+sub dataGetDeviceCreatedAt{
 	return $_[0]->{9002};
 }
 
 #get the  software version of the device
 #pass decoded JSON data of /15001/device-id 
-sub dataGetSoftwareVersion{
+sub dataGetDeviceSoftwareVersion{
 	return $_[0]->{3}{3};
 }
 
 #get, whether the device is reachable
 #pass decoded JSON data of /15001/device-id 
-sub dataGetReachabilityState{
+sub dataGetDeviceReachabilityState{
 	return $_[0]->{9019};
 }
 
 #get the timestamp, when the device was last seen by the gateway
 #pass decoded JSON data of /15001/device-id 
-sub dataGetLastSeen{
+sub dataGetDeviceLastSeen{
 	return $_[0]->{9020};
 }
 
 #get the device color code
 #if the device cannot change its color, this function returns 0
 #pass decoded JSON data of /15001/device-id 
-sub dataGetColor{
+sub dataGetDeviceColor{
 	if(exists($_[0]->{3311}[0]->{5706})){
 		return $_[0]->{3311}[0]->{5706};
 	}
@@ -258,17 +258,17 @@ sub TradfriDevice_Parse ($$){
 			return undef; #the string was probably not valid JSON
 		}
 
-		my $manufacturer = dataGetManufacturer($jsonData);
-		my $type = dataGetType($jsonData);
-		my $dimvalue = dataGetBrightness($jsonData);
+		my $manufacturer = dataGetDeviceManufacturer($jsonData);
+		my $type = dataGetDeviceType($jsonData);
+		my $dimvalue = dataGetDeviceBrightness($jsonData);
 		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = dataGetOnOff($jsonData) ? 'on':'off';
-		my $name = dataGetName($jsonData);
-		my $createdAt = FmtDateTimeRFC1123(dataGetCreatedAt($jsonData));
-		my $reachableState = dataGetReachabilityState($jsonData);
-		my $lastSeen = FmtDateTimeRFC1123(dataGetLastSeen($jsonData));
-		my $color = dataGetColor($jsonData);
-		my $version = dataGetSoftwareVersion($jsonData);
+		my $state = dataGetDeviceOnOff($jsonData) ? 'on':'off';
+		my $name = dataGetDeviceName($jsonData);
+		my $createdAt = FmtDateTimeRFC1123(dataGetDeviceCreatedAt($jsonData));
+		my $reachableState = dataGetDeviceReachabilityState($jsonData);
+		my $lastSeen = FmtDateTimeRFC1123(dataGetDeviceLastSeen($jsonData));
+		my $color = dataGetDeviceColor($jsonData);
+		my $version = dataGetDeviceSoftwareVersion($jsonData);
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
@@ -531,13 +531,13 @@ sub TradfriDevice_Set($@) {
 		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'on';
 
-		my ($coapPath, $coapData) = cmdSetOnOff($hash->{deviceAddress}, 1);
+		my ($coapPath, $coapData) = cmdSetDeviceOnOff($hash->{deviceAddress}, 1);
 		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "off"){
 		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'off';
 
-		my ($coapPath, $coapData) = cmdSetOnOff($hash->{deviceAddress}, 0);
+		my ($coapPath, $coapData) = cmdSetDeviceOnOff($hash->{deviceAddress}, 0);
 		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "dimvalue"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
@@ -545,7 +545,7 @@ sub TradfriDevice_Set($@) {
 		my $dimvalue = int($value);
 		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-		my ($coapPath, $coapData) = cmdSetBrightness($hash->{deviceAddress}, $dimvalue);
+		my ($coapPath, $coapData) = cmdSetDeviceBrightness($hash->{deviceAddress}, $dimvalue);
 		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
@@ -562,7 +562,7 @@ sub TradfriDevice_Set($@) {
 			$rgb = $value;
 		}
 	
-		my ($coapPath, $coapData) = cmdSetColorRGB($hash->{deviceAddress}, $rgb);
+		my ($coapPath, $coapData) = cmdSetDeviceColorRGB($hash->{deviceAddress}, $rgb);
 		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}
 

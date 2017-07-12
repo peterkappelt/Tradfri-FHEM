@@ -48,7 +48,7 @@ sub TradfriGateway_Initialize($) {
 	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
 	$hash->{MatchList} = {
 			"1:TradfriDevice" => '^observedUpdate\|coaps:\/\/[^\/]*\/15001',
-			"2:TradfriGroup" => "G.*" ,
+			"2:TradfriGroup" => '^observedUpdate\|coaps:\/\/[^\/]*\/15004' ,
 			};
 }
 

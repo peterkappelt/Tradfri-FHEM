@@ -9,6 +9,11 @@ use Data::Dumper;
 
 use TradfriLib;
 
+use constant{
+	PATH_GROUP_ROOT =>		'/15004',
+	PATH_MOODS_ROOT =>		'/15005',
+};
+
 my %TradfriGroup_gets = (
 	'groupInfo'		=> ' ',
 	'groupMembers' 	=> ' ',
@@ -30,6 +35,100 @@ my %TradfriGroup_sets = (
 #this hash will be filled with known moods, in the form 'moodname' => mood-id
 my %moodsKnown = ();
 
+#subs, that define command to control a group
+# cmdSet* functions will return a string, containing the last part of the CoAP path (like /15004/65537) and a string containing the JSON data that shall be written
+# dataGetGroup* functions will return the respective data, they expect a decoded JSON hash with the group information
+
+#get the command and the path to turn all devices in a group on or off
+#this requires two arguments: the group address and the on/off state (as 0 or 1)
+sub cmdSetGroupOnOff{
+		my $groupAddress = $_[0];
+		my $onOffState = $_[1];
+
+		my $jsonState = $onOffState ? 1:0;
+
+		my $command = {
+			'5850' => $jsonState
+		};
+
+		my $jsonString = JSON->new->utf8->encode($command);
+
+		return (PATH_GROUP_ROOT . "/$groupAddress", $jsonString);
+}
+
+#get the command and the path to set the brightness of all devices in agroup
+#this requires two arguments: the group address and the dimming value, between 0 and 254 (including these values)
+sub cmdSetGroupBrightness{
+		my $groupAddress = $_[0];
+		my $brightness = $_[1];
+
+		if($brightness > 254){
+				$brightness = 254;
+		}
+		if($brightness < 0){
+				$brightness = 0;
+		}
+
+		#caution: we need an hash reference here, so it must be defined with $
+		my $command = {
+			'5851' => $brightness
+		};
+
+		my $jsonString = JSON->new->utf8->encode($command);
+
+		return (PATH_GROUP_ROOT . "/$groupAddress", $jsonString);
+}
+
+#get the command and the path to set a preconfigured mood for the group
+#this requires two arguments: the group address and the mood id
+sub cmdSetGroupMood{
+		my $groupAddress = $_[0];
+		my $moodID = $_[1];
+
+		# @ToDo -> the group needs to be turned on, only setting the mood doesn't turn them on.
+		# check, whether the IKEA App does it the same way (->wireshark capture)
+
+		#caution: we need an hash reference here, so it must be defined with $
+		my $command = {
+			'9039' => $moodID,
+			'5850' => 1,
+		};
+
+		my $jsonString = JSON->new->utf8->encode($command);
+
+		return (PATH_GROUP_ROOT . "/$groupAddress", $jsonString);
+}
+
+#get the user defined name of the group
+#pass decoded JSON data of /15004/group-id
+sub dataGetGroupName{
+	return $_[0]->{9001};
+}
+
+#get the device IDs of all group members
+#pass decoded JSON data of /15001/group-id
+sub dataGetGroupMembers{
+	return $_[0]->{9018}{15002}{9003};
+}
+
+#get the current dimming value of a group
+#pass decoded JSON data of /15001/group-id 
+sub dataGetGroupBrightness{
+	return $_[0]->{5851};
+}
+
+#get the current on/off state of a group
+#pass decoded JSON data of /15001/group-id 
+sub dataGetGroupOnOff{
+	return $_[0]->{5850};
+}
+
+#get the timestamp, when the group was created
+#pass decoded JSON data of /15001/group-id 
+sub dataGetGroupCreatedAt{
+	return $_[0]->{9002};
+}
+
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
 
@@ -39,8 +138,9 @@ sub TradfriGroup_Initialize($) {
 	$hash->{GetFn}      = 'TradfriGroup_Get';
 	$hash->{AttrFn}     = 'TradfriGroup_Attr';
 	$hash->{ReadFn}     = 'TradfriGroup_Read';
+	$hash->{ParseFn}	= 'TradfriGroup_Parse';
 
-	$hash->{Match} = ".*";
+	$hash->{Match} = '^observedUpdate\|coaps:\/\/[^\/]*\/15004';
 
 	$hash->{AttrList} =
 		"autoUpdateInterval "
@@ -59,12 +159,15 @@ sub TradfriGroup_Define($$) {
 	$hash->{name}  = $param[0];
 	$hash->{groupAddress} = $param[2];
 
+	#reverse search, for Parse
+	$modules{TradfriGroup}{defptr}{$hash->{groupAddress}} = $hash;
+
 	AssignIoPort($hash);
 
-	TradfriGroup_Get($hash, $hash->{name}, 'moods');
+	#start observing the coap resource, so the module will be informed about status updates
+	IOWrite($hash, 'observeStart', PATH_GROUP_ROOT . "/" . $hash->{groupAddress}, '');
 
-	#my $autoUpdateInterval = AttrVal($hash->{name}, 'autoUpdateInterval', 0);
-	#InternalTimer(gettimeofday()+$autoUpdateInterval, "TradfriGroup_GetUpdate", $hash) unless ($autoUpdateInterval == 0);
+	TradfriGroup_Get($hash, $hash->{name}, 'moods');
 
 	return undef;
 }
@@ -72,6 +175,59 @@ sub TradfriGroup_Define($$) {
 sub TradfriGroup_Undef($$) {
 	my ($hash, $arg) = @_; 
 	# nothing to do
+	return undef;
+}
+
+sub TradfriGroup_Parse($$){
+	my ($io_hash, $message) = @_;
+	
+	#the message contains 'coapObserveStart|coapPath|data' -> split it by the pipe character
+	my @parts = split('\|', $message);
+
+	if(int(@parts) < 3){
+		#expecting at least three parts
+		return undef;
+	}
+
+	#$parts[1], the coapPath is build up like this: coaps://Ip-or-dns-of-gateway/15004/Id-of-group
+	#extract the group id with the following regex:
+	my ($temp, $msgGroupId) = ($parts[1] =~ /(^coap.?:\/\/[^\/]*\/15004\/)([0-9]*)/);
+
+	#check if group with the id exists
+	if(my $hash = $modules{TradfriGroup}{defptr}{$msgGroupId}) 
+	{
+		# the path returned "Not Found" -> unknown resource, but this message still suits for this group
+		if($parts[2] eq "Not Found"){
+			$hash->{STATE} = "NotFound";
+			return $hash->{NAME};
+		}
+
+		#parse the JSON data
+		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+		if($@){
+			return undef; #the string was probably not valid JSON
+		}
+
+		my $createdAt = FmtDateTimeRFC1123(dataGetGroupCreatedAt($jsonData));
+		my $name = dataGetGroupName($jsonData);
+		my $memberArray = dataGetGroupMembers($jsonData);
+		my $members = join(' ', @{$memberArray});
+		my $dimvalue = dataGetGroupBrightness($jsonData);
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+		my $state = dataGetGroupOnOff($jsonData) ? 'on':'off';
+
+		readingsBeginUpdate($hash);
+		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
+		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
+		readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
+		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
+		readingsEndUpdate($hash, 1);
+		
+		#return the appropriate group's name
+		return $hash->{NAME}; 
+	}
+	
 	return undef;
 }
 
@@ -303,35 +459,29 @@ sub TradfriGroup_Set($@) {
 		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood:$moodsList";
 	}
 	
-	$hash->{STATE} = $TradfriGroup_sets{$opt} = $value;
+	$TradfriGroup_sets{$opt} = $value;
 
 	if($opt eq "on"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-		TradfriLib::groupSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, 1);
-		readingsSingleUpdate($hash, 'state', 'on', 1);
+		#@todo state shouldn't be updated here?!
+		$hash->{STATE} = 'on';
+		
+		my ($coapPath, $coapData) = cmdSetGroupOnOff($hash->{groupAddress}, 1);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "off"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-		TradfriLib::groupSetOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, 0);
-		readingsSingleUpdate($hash, 'state', 'off', 1);
+		#@todo state shouldn't be updated here?!
+		$hash->{STATE} = 'off';
+		
+		my ($coapPath, $coapData) = cmdSetGroupOnOff($hash->{groupAddress}, 0);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "dimvalue"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
 		return '"set TradfriGroup dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 
 		my $dimvalue = int($value);
 		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-		TradfriLib::groupSetBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, $dimvalue);
-		readingsSingleUpdate($hash, 'dimvalue', int($value), 1);
+		my ($coapPath, $coapData) = cmdSetGroupBrightness($hash->{groupAddress}, $dimvalue);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}elsif($opt eq "mood"){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
 		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
 
 		if(!($value =~ /[1-9]+/)){
@@ -349,8 +499,8 @@ sub TradfriGroup_Set($@) {
 			}
 		}
 
-		TradfriLib::groupSetMood($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, int($value));
-		readingsSingleUpdate($hash, 'mood', int($value), 1);
+		my ($coapPath, $coapData) = cmdSetGroupMood($hash->{groupAddress}, $value);
+		return IOWrite($hash, 'write', $coapPath, $coapData);
 	}
 
 	return undef;
