@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.1
+# @version 1.16.dev-cf.2
 
 package main;
 use strict;
@@ -69,7 +69,7 @@ sub TradfriGateway_Define($$) {
 	$hash->{gatewaySecret} = $param[3];
 
 	# @todo make user settable
-	$hash->{DeviceName} = "localhost:505";
+	$hash->{DeviceName} = "localhost:1505";
 
 	if(int(@param) > 4){
 		#there was a fifth parameter
