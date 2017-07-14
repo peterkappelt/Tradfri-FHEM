@@ -5,6 +5,8 @@ package main;
 use strict;
 use warnings;
 
+use IO::Select;
+
 require 'DevIo.pm';
 
 use constant{
@@ -146,6 +148,13 @@ sub TradfriGateway_Write ($@){
 	}elsif($arguments[0] eq 'observeStart'){
 		TradfriGateway_StartObserve($hash, $arguments[1]);
 	}elsif($arguments[0] eq 'get'){
+		#@todo check if there is already dat ato read -> call the read function first, before expecting it here
+		# this is a little dirty way to check for available data -> to be improved
+		my $sel = new IO::Select($hash->{TCPDev});
+		if($sel->can_read(0)){
+			TradfriGateway_Read($hash);
+		}
+
 		Log(4, "[TradfriGateway] Get from $arguments[1]");
 		my $getReturn = DevIo_Expect($hash, "coapGet|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 1);
 		my @getReturnParts = split(/\|/, $getReturn);

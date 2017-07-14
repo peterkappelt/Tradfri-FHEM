@@ -6,6 +6,7 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use JSON;
 
 use constant{
 	PATH_GROUP_ROOT =>		'/15004',
@@ -307,7 +308,7 @@ sub TradfriGroup_Get($@) {
 		
 		#parse the JSON data
 		my $moodIDList = eval{ JSON->new->utf8->decode($jsonText) };
-		if($@){
+		if(($@) || (ref($moodIDList) ne 'ARRAY')){
 			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
 		}
 
