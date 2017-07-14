@@ -1,13 +1,17 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.2
+# @version 1.16.dev-cf.3
 
 package main;
 use strict;
 use warnings;
 
-use TradfriLib;
-
 require 'DevIo.pm';
+
+use constant{
+	PATH_DEVICE_ROOT =>		'/15001',
+	PATH_GROUP_ROOT =>		'/15004',
+	PATH_MOODS_ROOT =>		'/15005',
+};
 
 my %TradfriGateway_sets = (
 	'reopen'	=> ' ',
@@ -16,22 +20,10 @@ my %TradfriGateway_sets = (
 my %TradfriGateway_gets = (
 	'deviceList'	=> ' ',
 	'groupList'		=> ' ',
-	'coapClientVersion'		=> ' ',
 );
 
-sub checkCoapClient{
-	#check, if coap-client software exists. Set the Reading 'coapClientVersion' to the first line of the programm call's output
-	my $coapClientReturnMessage = `coap-client 2>&1`;
-	if($coapClientReturnMessage eq ''){
-		#empty return -> error
-		$_[0]->{canConnect} = 0;
-		return "UNKNOWN";
-	}else{
-		readingsSingleUpdate($_[0], 'coapClientVersion', (split(/\n/, $coapClientReturnMessage))[0], 0);
-		$_[0]->{canConnect} = 1;
-		return (split(/\n/, $coapClientReturnMessage))[0];
-	}
-}
+#all pathes that are observed
+my %observeCache = ();
 
 sub TradfriGateway_Initialize($) {
 	my ($hash) = @_;
@@ -57,7 +49,7 @@ sub TradfriGateway_Define($$) {
 	my @param = split('[ \t]+', $def);
 	
 	if(int(@param) < 4) {
-		return "too few parameters: define <name> TradfriGateway <gateway-ip> <gateway-secret> [<coap-client-directory>]";
+		return "too few parameters: define <name> TradfriGateway <gateway-ip> <gateway-secret>";
 	}
 
 	#close connection to socket, if open
@@ -74,14 +66,9 @@ sub TradfriGateway_Define($$) {
 	if(int(@param) > 4){
 		#there was a fifth parameter
 		#it is the path to the coap client, add it to the environments path
-		$ENV{PATH}="$ENV{PATH}:" . $param[4];
+		#Edit: it is obsolete now! Give advice to the user
+		Log(0, "[TradfriGateway] The parameter \"coap-client-directory\" in the gateway's definition is obsolete now! Please remove it as soon as possible!")
 	}
-
-	#$hash->{STATE} = "INITIALIZED";
-
-	#if(checkCoapClient($hash) ne "UNKNOWN"){
-	#	$hash->{STATE} = "IDLE";
-	#}
 
 	#open the socket connection
 	#@todo react to return code
@@ -99,10 +86,37 @@ sub TradfriGateway_Undef($$) {
 sub TradfriGateway_DeviceInit($){
 	my $hash = shift;
 
-	#@todo restart observing the necessary pathes
-
 	#set the PSK
 	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
+
+	#start to observe all necessary resources
+	TradfriGateway_StartObserveAll($hash);
+}
+
+#start to observe a specified path and handle the caching of the observed paths
+sub TradfriGateway_StartObserve($$){
+	my ( $hash, $path ) = @_;
+
+	#start observing immediatly, if connection is open
+	if($hash->{STATE} eq 'opened'){
+		Log(3, "[TradfriGateway] Start to observe path $path");
+		DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $path . "\n", 2, 0);
+	}
+
+	#put the path to the "observeCache" -> if the connection dies, the coapObserveStart command needs to be called again.
+	if(!exists($observeCache{"$path"})){
+		$observeCache{"$path"} = "$path";
+	}
+}
+
+#observe all resources, that are stored in the cache. A path is usually stored in the cache when the sub-device is initialized
+sub TradfriGateway_StartObserveAll($){
+	my ($hash) = @_;
+
+	foreach my $observePath ( keys %observeCache ){
+		Log(3, "[TradfriGateway] Start to observe path $observePath");
+		DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $observePath . "\n", 2, 0);
+	}
 }
 
 # a write command, that is dispatch from the logical module to here via IOWrite requires three arguments:
@@ -112,7 +126,7 @@ sub TradfriGateway_DeviceInit($){
 #		- 'get' -> CoAP-GET from a specified path, argument #3 can be an empty string. This call is blocking, the call waits for an answer.
 # 2.: the incomplete coap path, like "/15001/65537". The first part of the path will be handled by this module
 # 3.: the payload data, for Tradfri as as JSON string
-sub TradfriGateway_Write ($$){
+sub TradfriGateway_Write ($@){
 	my ( $hash, @arguments) = @_;
 	
 	if(int(@arguments < 3)){
@@ -130,11 +144,13 @@ sub TradfriGateway_Write ($$){
 		Log(3, "[TradfriGateway] Put of $arguments[2] to $arguments[1]");
 		DevIo_SimpleWrite($hash, "coapPutJSON|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "|" . $arguments[2] . "\n", 2, 0);
 	}elsif($arguments[0] eq 'observeStart'){
-		Log(3, "[TradfriGateway] Start to observe path $arguments[1]");
-		DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 2, 0);
+		TradfriGateway_StartObserve($hash, $arguments[1]);
 	}elsif($arguments[0] eq 'get'){
 		Log(4, "[TradfriGateway] Get from $arguments[1]");
-		return DevIo_Expect($hash, "coapGet|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 1);
+		my $getReturn = DevIo_Expect($hash, "coapGet|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 1);
+		my @getReturnParts = split(/\|/, $getReturn);
+		return $getReturnParts[2] if int(@getReturnParts) >= 3;
+		return "UNDEF";
 	}
 
 	#@todo return code handling
@@ -163,8 +179,8 @@ sub TradfriGateway_Read ($){
 		$message =~ s/\r//g;
 		$message =~ s/\n//g;
 
-		#dispatch the message if it isn't empty
-		if($message ne ''){
+		#dispatch the message if it isn't empty, only dispatch messages that come from an observe
+		if(($message ne '') && ((split(/\|/, $message))[0] eq 'observedUpdate')){
 			Dispatch($hash, $message, undef);
 		}
 	}
@@ -189,52 +205,61 @@ sub TradfriGateway_Get($@) {
 	}
 	
 	if($opt eq 'deviceList'){
-		my $deviceIDList = TradfriLib::getDevices($hash->{gatewayAddress}, $hash->{gatewaySecret});
-			
-		if(!defined($deviceIDList)){
-			return "Error while trying to fetch devices!";
+		my $jsonText = TradfriGateway_Write($hash, 'get', PATH_DEVICE_ROOT, '');
+
+		if(!defined($jsonText)){
+			return "Error while fetching devices!";
+		}
+		
+		#parse the JSON data
+		my $deviceIDList = eval{ JSON->new->utf8->decode($jsonText) };
+		if($@){
+			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
 		}
 
 		my $returnUserString = "";
 
+		#@todo read the device info
 		for(my $i = 0; $i < scalar(@{$deviceIDList}); $i++){
-			my $deviceInfo = TradfriLib::getDeviceInfo($hash->{gatewayAddress}, $hash->{gatewaySecret}, ${$deviceIDList}[$i]);
 			$returnUserString .= "- " . 
 				${$deviceIDList}[$i] . 
-				": " . 
-				TradfriLib::getDeviceManufacturer($deviceInfo) .
-				" " .
-				TradfriLib::getDeviceType($deviceInfo) .
-				" (" .
-				TradfriLib::getDeviceName($deviceInfo) .
-				")" .
+			#	": " . 
+			#	TradfriLib::getDeviceManufacturer($deviceInfo) .
+			#	" " .
+			#	TradfriLib::getDeviceType($deviceInfo) .
+			#	" (" .
+			#	TradfriLib::getDeviceName($deviceInfo) .
+			#	")" .
 				"\n";
 		}
 
 		return $returnUserString;
 	}elsif($opt eq 'groupList'){
-		my $groupIDList = TradfriLib::getGroups($hash->{gatewayAddress}, $hash->{gatewaySecret});
+		my $jsonText = TradfriGateway_Write($hash, 'get', PATH_GROUP_ROOT, '');
 
-		if(!defined($groupIDList)){
+		if(!defined($jsonText)){
 			return "Error while fetching groups!";
+		}
+		
+		#parse the JSON data
+		my $groupIDList = eval{ JSON->new->utf8->decode($jsonText) };
+		if($@){
+			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
 		}
 
 		my $returnUserString = "";
 
+		#@todo read group info
 		for(my $i = 0; $i < scalar(@{$groupIDList}); $i++){
-			my $groupInfo = TradfriLib::getGroupInfo($hash->{gatewayAddress}, $hash->{gatewaySecret}, ${$groupIDList}[$i]);
-
 			$returnUserString .= "- " .
 				${$groupIDList}[$i] .
-				": " .
-				TradfriLib::getGroupName($groupInfo) . 
+				#": " .
+				#TradfriLib::getGroupName($groupInfo) . 
 				"\n";
 
 		}
 
 		return $returnUserString;
-	}elsif($opt eq 'coapClientVersion'){
-		return checkCoapClient($hash);
 	}
 
 	return $TradfriGateway_gets{$opt};
@@ -299,20 +324,14 @@ sub TradfriGateway_Attr(@) {
     <a name="TradfriGatewaydefine"></a>
     <b>Define</b>
     <ul>
-        <code>define &lt;name&gt; TradfriGateway &lt;gateway-ip&gt; &lt;gateway-secret&gt; [&lt;coap-client-path&gt;]</code>
+        <code>define &lt;name&gt; TradfriGateway &lt;gateway-ip&gt; &lt;gateway-secret&gt;</code>
         <br><br>
         Example: <code>define trGateway TradfriGateway TradfriGW.int.kappelt.net vBkxxxxxxxxxx7hz</code>
         <br><br>
         The IP can either be a "normal" IP-Address, like 192.168.2.60, or a DNS name (like shown above).<br>
         You can find the secret on a label on the bottom side of the gateway.
-        The parameter "coap-client-path" is only necessary, if the module cannot find the coap-client you've installed before.
-        See the github page (<a href="https://github.com/peterkappelt/Tradfri-FHEM#debugging-get-coapclientversion--unknown">
-        									https://github.com/peterkappelt/Tradfri-FHEM#debugging-get-coapclientversion--unknown
-        									</a>) for further information.<br>
-		<br>
-        In order to define a gateway and connect to it, you need to install the software "coap-client" on your system. See <a href="https://github.com/peterkappelt/Tradfri-FHEM#prerequisites">
-        									https://github.com/peterkappelt/Tradfri-FHEM#prerequisites
-        									</a>
+        The parameter "coap-client-path" is isn't used anymore and thus not shown here anymore. Please remove it as soon as possible, if you are still using it.<br>
+		You need to run kCoAPSocket running in background, that acts like a translator between FHEM and the Trådfri Gateway.
     </ul>
     <br>
     
@@ -329,7 +348,8 @@ sub TradfriGateway_Attr(@) {
               <li><i>reopen</i><br>
                   Re-open the connection to the Java TCP socket, that acts like a "translator" between FHEM and the Tradfri-CoAP-Infrastructure.<br>
                   If the connection is already opened, it'll be closed and opened.<br>
-                  If the connection isn't open yet, a try to open it will be executed.</li>
+                  If the connection isn't open yet, a try to open it will be executed.<br>
+                  <b>Caution: </b>Running this command seems to trigger some issues! Do <i>not</i> run it before a update is available!</li>
         </ul>
     </ul>
     <br>

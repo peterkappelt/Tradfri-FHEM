@@ -1,13 +1,11 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.2
+# @version 1.16.dev-cf.3
 
 package main;
 use strict;
 use warnings;
 
 use Data::Dumper;
-
-use TradfriLib;
 
 use constant{
 	PATH_GROUP_ROOT =>		'/15004',
@@ -16,13 +14,7 @@ use constant{
 
 my %TradfriGroup_gets = (
 	'groupInfo'		=> ' ',
-	'groupMembers' 	=> ' ',
-	'dimvalue'		=> ' ',
-	'state'			=> ' ',
-	'name'			=> ' ',
 	'moods'			=> ' ',
-	'createdAt'		=> ' ',
-	'updateInfo'	=> ' ',
 );
 
 my %TradfriGroup_sets = (
@@ -31,6 +23,49 @@ my %TradfriGroup_sets = (
 	'dimvalue'	=> '',
 	'mood'		=> '',
 );
+
+# The output of the path PATH_GROUP_ROOT/GROUP_ADDRESS looks like follows (for bulbs, that can not change color)
+#$VAR1 = {
+#          '9003' => 193768,						-> id
+#          '9018' => {								-> "HS_ACCESSORY_LINK"
+#                      '15002' => {
+#                                   '9003' => [
+#                                               65536,
+#                                               65537,			-> sub-devices, contained in group
+#                                               65538
+#                                             ]
+#                                 }
+#                    },
+#          '5851' => 0,								-> dimming value
+#          '9039' => 199947,						-> mood id
+#          '5850' => 1,								-> on/off
+#          '9002' => 1492280898,					-> created at
+#          '9001' => 'TRADFRI group'				-> name
+#        };
+#
+# Moods are defined per Group
+# An array of the mood ids of the group can be accessed under PATH_MOODS_ROOT/GROUP_ADDRESS
+#
+# the individual mood info is accessed under PATH_MOODS_ROOT/GROUP_ADDRESS/MOOD_ID
+# {
+#    "9001":"FOCUS",												-> user name
+#    "9002":1494088485,												-> created at?
+#    "9003":206399,													-> mood id
+#    "9057":2,														
+#    "9068":1,														-> 1 means that mood is predefined by IKEA ?
+#    "15013":[														-> configs for individual member devices
+#       {
+#          "5850":1,												-> on/ off
+#          "5851":254,												-> dimvalue
+#          "9003":65537												-> member id
+#       },
+#       {
+#          "5850":1,
+#          "5851":254,
+#          "9003":65538
+#       }
+#    ]
+# }
 
 #this hash will be filled with known moods, in the form 'moodname' => mood-id
 my %moodsKnown = ();
@@ -106,27 +141,33 @@ sub dataGetGroupName{
 }
 
 #get the device IDs of all group members
-#pass decoded JSON data of /15001/group-id
+#pass decoded JSON data of /15004/group-id
 sub dataGetGroupMembers{
 	return $_[0]->{9018}{15002}{9003};
 }
 
 #get the current dimming value of a group
-#pass decoded JSON data of /15001/group-id 
+#pass decoded JSON data of /15004/group-id 
 sub dataGetGroupBrightness{
 	return $_[0]->{5851};
 }
 
 #get the current on/off state of a group
-#pass decoded JSON data of /15001/group-id 
+#pass decoded JSON data of /15004/group-id 
 sub dataGetGroupOnOff{
 	return $_[0]->{5850};
 }
 
 #get the timestamp, when the group was created
-#pass decoded JSON data of /15001/group-id 
+#pass decoded JSON data of /15004/group-id 
 sub dataGetGroupCreatedAt{
 	return $_[0]->{9002};
+}
+
+#get the user defined name of a mood
+#pass decoded JSON data of /15005/group-id/mood-id
+sub dataGetMoodName{
+	return $_[0]->{9001};
 }
 
 sub TradfriGroup_Initialize($) {
@@ -143,8 +184,7 @@ sub TradfriGroup_Initialize($) {
 	$hash->{Match} = '^observedUpdate\|coaps:\/\/[^\/]*\/15004';
 
 	$hash->{AttrList} =
-		"autoUpdateInterval "
-		. "usePercentDimming:1,0 "
+		"usePercentDimming:1,0 "
 		. $readingFnAttributes;
 }
 
@@ -167,6 +207,7 @@ sub TradfriGroup_Define($$) {
 	#start observing the coap resource, so the module will be informed about status updates
 	IOWrite($hash, 'observeStart', PATH_GROUP_ROOT . "/" . $hash->{groupAddress}, '');
 
+	#@todo shall the moods get updated here?
 	TradfriGroup_Get($hash, $hash->{name}, 'moods');
 
 	return undef;
@@ -231,16 +272,6 @@ sub TradfriGroup_Parse($$){
 	return undef;
 }
 
-sub TradfriGroup_GetUpdate($@){
-	my ($hash) = @_;
-
-	if(AttrVal($hash->{name}, 'autoUpdateInterval', 0) != 0){
-		TradfriGroup_Get($hash, $hash->{name}, 'updateInfo');
-
-		InternalTimer(gettimeofday()+AttrVal($hash->{name}, 'autoUpdateInterval', 30), "TradfriGroup_GetUpdate", $hash);
-	}
-}
-
 sub TradfriGroup_Get($@) {
 	my ($hash, @param) = @_;
 	
@@ -254,124 +285,30 @@ sub TradfriGroup_Get($@) {
 	}
 	
 	if($opt eq 'groupInfo'){
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
+		my $jsonText = IOWrite($hash, 'get', PATH_GROUP_ROOT . "/" . $hash->{groupAddress}, '');
 
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-
-		if(!defined($jsonGroupInfo)){
+		if(!defined($jsonText)){
 			return "Error while fetching group info!";
 		}
-
-		return(Dumper($jsonGroupInfo));
-	}elsif($opt eq 'groupMembers'){
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
+		
+		#parse the JSON data
+		my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
+		if($@){
+			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
 		}
 
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if(!defined($jsonGroupInfo)){
-			return "Error while fetching group info!";
-		}
-
-		my $memberArray = TradfriLib::getGroupMembers($jsonGroupInfo);
-		my $returnString = '';
-
-		# prepare a humand readable list of the devices, containing device type, manufacturer and name
-		for(my $i = 0; $i < scalar(@{$memberArray}); $i++){
-			my $currentDeviceInfo = TradfriLib::getDeviceInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, ${$memberArray}[$i]);
-
-			$returnString .= '- ' . ${$memberArray}[$i] . ': ';
-
-			if(!defined($currentDeviceInfo)){
-				$returnString .= 'Unknown';
-			}else{
-				$returnString .= TradfriLib::getDeviceManufacturer($currentDeviceInfo) .
-					" " .
-					TradfriLib::getDeviceType($currentDeviceInfo) .
-					" (" .
-					TradfriLib::getDeviceName($currentDeviceInfo) .
-					")";
-			}
-
-			$returnString .= "\n";
-		}
-
-		#update the reading with a list of the device IDs, space seperated
-		readingsSingleUpdate($hash, 'members', join(' ', @{$memberArray}), 1);
-
-		return $returnString;
-	}elsif($opt eq 'dimvalue'){
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if(!defined($jsonGroupInfo)){
-			return "Error while fetching group info!";
-		}
-
-		my $dimvalue = TradfriLib::getGroupBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo);
-
-		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-
-		readingsSingleUpdate($hash, 'dimvalue', $dimvalue, 1);
-		return $dimvalue;
-	}elsif($opt eq 'state'){
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if(!defined($jsonGroupInfo)){
-			return "Error while fetching group info!";
-		}
-
-		my $state = TradfriLib::getGroupOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo) ? 'on':'off';
-		readingsSingleUpdate($hash, 'state', $state, 1);
-		return $state;
-	}elsif($opt eq 'name'){
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if(!defined($jsonGroupInfo)){
-			return "Error while fetching group info!";
-		}
-
-		my $name = TradfriLib::getGroupName($jsonGroupInfo);
-		readingsSingleUpdate($hash, 'name', $name, 1);
-		return $name;
-	}elsif($opt eq 'createdAt'){
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if(!defined($jsonGroupInfo)){
-			return "Error while fetching group info!";
-		}
-
-		my $createdAt = FmtDateTimeRFC1123(TradfriLib::getGroupCreatedAt($jsonGroupInfo));
-		readingsSingleUpdate($hash, 'createdAt', $createdAt, 1);
-		return $createdAt;
+		return Dumper($jsonData);
 	}elsif($opt eq 'moods'){
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
+		my $jsonText = IOWrite($hash, 'get', PATH_MOODS_ROOT . "/" . $hash->{groupAddress}, '');
 
-		my $moodIDList = TradfriLib::getMoods($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-
-		if(!defined($moodIDList)){
+		if(!defined($jsonText)){
 			return "Error while fetching moods!";
+		}
+		
+		#parse the JSON data
+		my $moodIDList = eval{ JSON->new->utf8->decode($jsonText) };
+		if($@){
+			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
 		}
 
 		my $returnUserString = "";
@@ -379,10 +316,19 @@ sub TradfriGroup_Get($@) {
 		%moodsKnown = ();
 
 		for(my $i = 0; $i < scalar(@{$moodIDList}); $i++){
-			my $moodInfo = TradfriLib::getMoodInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress}, ${$moodIDList}[$i]);
+			my $jsonMoodText = IOWrite($hash, 'get', PATH_MOODS_ROOT . "/" . $hash->{groupAddress} . "/" . ${$moodIDList}[$i], '');
+
+			my $moodName = "UNKNOWN";
+
+			if(defined($jsonMoodText)){
+				#parse the JSON data
+				my $moodInfo = eval{ JSON->new->utf8->decode($jsonMoodText) };
+				if(!($@)){
+					$moodName = dataGetMoodName($moodInfo);
+				}
+			}
 
 			#remove whitespaces in mood names
-			my $moodName = TradfriLib::getMoodName($moodInfo);
 			$moodName =~ s/\s//;
 
 			$returnUserString .= "- " .
@@ -402,33 +348,6 @@ sub TradfriGroup_Get($@) {
 		readingsSingleUpdate($hash, 'moods', $returnReadingString, 1);
 
 		return $returnUserString;
-	}elsif($opt eq 'updateInfo'){
-		#update the following readings: createdAt, state, name, dimvalue, groupMembers
-		#check, whether we can connect to the gateway
-		if(!$hash->{IODev}{canConnect}){
-			return "The gateway device does not allow to connect to the gateway!\nThat usually means, that the software \"coap-client\" isn't found/ executable.\nCheck that and run \"get coapClientVersion\" on the gateway device!";
-		}
-
-		my $jsonGroupInfo = TradfriLib::getGroupInfo($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $hash->{groupAddress});
-		if(!defined($jsonGroupInfo)){
-			return "Error while fetching group info!";
-		}
-
-		my $createdAt = FmtDateTimeRFC1123(TradfriLib::getGroupCreatedAt($jsonGroupInfo));
-		my $name = TradfriLib::getGroupName($jsonGroupInfo);
-		my $memberArray = TradfriLib::getGroupMembers($jsonGroupInfo);
-		my $members = join(' ', @{$memberArray});
-		my $dimvalue = TradfriLib::getGroupBrightness($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo);
-		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = TradfriLib::getGroupOnOff($hash->{IODev}{gatewayAddress}, $hash->{IODev}{gatewaySecret}, $jsonGroupInfo) ? 'on':'off';
-
-		readingsBeginUpdate($hash);
-		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
-		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
-		readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
-		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
-		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
-		readingsEndUpdate($hash, 1);
 	}
 
 	return $TradfriGroup_gets{$opt};
@@ -504,28 +423,14 @@ sub TradfriGroup_Set($@) {
 	}
 
 	return undef;
-
-	#return "$opt set to $value.";
 }
 
 
 sub TradfriGroup_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
 	if($cmd eq "set") {
-		if($attr_name eq "autoUpdateInterval"){
-			if($attr_value eq ''){
-				return "You need to specify the interval!";
-			}
-			if($attr_value ne 0){
-				my $hash = $defs{$name};
+		if($attr_name eq ""){
 
-				InternalTimer(gettimeofday()+AttrVal($hash->{name}, 'autoUpdateInterval', 30), "TradfriGroup_GetUpdate", $hash);
-			}
-#		}elsif($attr_name eq "gatewaySecret"){
-#			if($attr_value ne ''){
-#			}else{
-#				return "You need to specify a gateway secret!";
-#			}
 		}
 	}
 	return undef;
@@ -604,35 +509,42 @@ sub TradfriGroup_Attr(@) {
 		<br><br>
         Options:
         <ul>
-              <li><i>createdAt</i><br>
-                  Get the date and the time, when the group was created.<br>
-                  Additionally, the reading "createdAt" is set to the resulting value.</li>
-              <li><i>dimvalue</i><br>
-                  Get the brightness value of the group<br>
-                  If the member devices are set to different brightnesses, this will return the mean of the member brightnesses<br>
-                  Additionally, the reading "dimvalue" is set to the resulting value.</li>
               <li><i>groupInfo</i><br>
                   The RAW JSON-formatted data, that was returned from the group info. Just for development and/ or additional info</li>
-        	  <li><i>groupMembers</i><br>
-                  Returns a list of member device IDs, there name and type.<br>
-                  Additionally, the reading "members" is set to a space-seperated list of the member's device IDs</li>
                <li><i>moods</i><br>
                   Get all moods (their name and their ID) that are configured for this group<br>
                   Please note, that the mood IDs may differ between different groups (though they are the same moods) -> check them for each group
                   Additionally, the reading "moods" is set to a list of available moods.</li>
-              <li><i>name</i><br>
-                  Get user defined name of the group<br>
-                  Additionally, the reading "name" is set to the resulting value.</li>
-              <li><i>state</i><br>
-                  Get the state (-> on/off) of the group<br>
-                  It is "on", if at least one of the member devices is on<br>
-                  Additionally, the reading "state" is set to the resulting value.</li>
-              <li><i>updateInfo</i><br>
-                  Update the readings createdAt, dimvalue, members, name and state according to the above described values.</li>
         </ul>
     </ul>
     <br>
     
+	<a name="TradfriGroupreadings"></a>
+    <b>Readings</b><br>
+    <ul>
+        The following readings are displayed for a group. Once there is a change and the connection to the gateway is made, they get updated automatically.
+		<br><br>
+        Readings:
+        <ul>
+              <li><i>createdAt</i><br>
+                  A timestamp string, like "Sat, 15 Apr 2017 18:29:24 GMT", that indicates, when the group was created in the gateway.</li>
+              <li><i>dimvalue</i><br>
+                  The brightness that is set for this group. It is a integer in the range of 0 to 100/ 254.<br>
+                  The greatest dimvalue depends on the attribute "usePercentDimming", see below.</li>
+              <li><i>members</i><br>
+                  A space separated list of all device IDs that are member of this group.</li>
+              <li><i>moods</i><br>
+                  A space separated list of all moods and their names that are defined for the group, e.g.<br>
+                  198884//EVERYDAY 213983//RELAX 206399//FOCUS<br>
+                  This reading isn't updated automatically, you've to call "get moods" in order to refresh them.</li>    
+              <li><i>name</i><br>
+                  The name of the group that you've set in the app.</li>
+              <li><i>state</i><br>
+                  Indicates, whether the group is on or off. Thus, the reading's value is either "on" or "off", too.</li>
+        </ul>
+    </ul>
+    <br>
+
     <a name="TradfriGroupattr"></a>
     <b>Attributes</b>
     <ul>
@@ -643,10 +555,6 @@ sub TradfriGroup_Attr(@) {
         <br><br>
         Attributes:
         <ul>
-            <li><i>autoUpdateInterval</i> <time-seconds><br>
-            	If this value is not 0 or undefined, the readings createdAt, dimvalue, members, name and state will be updated automatically.<br>
-            	The value is the duration between the updates, in seconds.
-            </li>
             <li><i>usePercentDimming</i> 0/1<br>
             	If this attribute is one, the largest value for "set dimvalue" will be 100.<br>
             	Otherwise, the largest value is 254.<br>

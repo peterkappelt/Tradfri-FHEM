@@ -1,6 +1,7 @@
-- 13.7.2017 (1.16.dev-cf.2)
-  - <b>important</b>:  Read http://electronic.kappelt.net/wordpress/ikea-tradfri-module-for-fhem-beta/
-                Changes in call of Java Socket!
+- 13.7.2017 (1.16.dev-cf.3)
+  - important:  Please update Java Socket!!!
+  - feature:    This module now completely uses the new Java Socket, old parts were removed
+  - bugfix:     better error condition handling, restart handling
 
 - 5.7.2017 (1.16)
   - bugfix:     31_TradfriGroup: no more warnings ("smartmatch") @ FHEM startup
