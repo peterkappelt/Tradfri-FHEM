@@ -1,3 +1,10 @@
+- 5.7.2017 (1.16)
+  - bugfix:     31_TradfriGroup: no more warnings ("smartmatch") @ FHEM startup
+  - bugfix:     31_TradfriDevice: no more warnings @ FHEM startup
+  - bugfix:     30_TradfriGateway: no more warnings @ FHEM startup
+  - bugfix:     31_TradfriGroup: fixed error in attribute list
+  - bugfix:     31_TradfriDevice: fixed error in attribute list
+
 - 4.7.2017 (1.15)
   - feature:    31_TradfriGroup: set the mood by name
   - bugfix:     31_TradfriGroup: setting mood didn't turn devices on
