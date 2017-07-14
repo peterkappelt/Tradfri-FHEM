@@ -2,10 +2,22 @@
 
 This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
 
+## About this branch
+Currently, there are two versions of this module: One is meant for the general and productive use, the other one is a development version.
+There are some issues in the "old" productive version (e.g. devices can only be read by polling, requires an external software) that can only be solved by some bigger changes.
+Those bigger changes are development and tested in the development version (the dev-cf branch).
+Once the development version is stable enough it'll be merged into the master-branch, thus will be rolled out to everyone who uses this module.
+
+However, some people might want to keep the old implementation of this module (fear of problems with the new version, aversion against Java, ...).
+So, they could switch to this branch - "v1". Support and updates for the old implementation will still happen here.
+
+__What to do?__ Most likely, you don't need to do anything. Just follow the instructions in the master-branch and keep the repository, that was listed there.
+One might only switch to this branch if he has real concerns about the upcoming bigger update.
+
 ## Install to FHEM
 Run the following commands to add this repository to your FHEM setup:
 ```
-update add https://raw.githubusercontent.com/peterkappelt/Tradfri-FHEM/master/src/controls_tradfri.txt
+update add https://raw.githubusercontent.com/peterkappelt/Tradfri-FHEM/v1/src/controls_tradfri.txt
 update
 shutdown restart
 ```
