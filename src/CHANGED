@@ -2,6 +2,7 @@
   - important:  Please update Java Socket!!!
   - feature:    This module now completely uses the new Java Socket, old parts were removed
   - bugfix:     better error condition handling, restart handling
+  - new:        Port in Java Socket changed!
 
 - 5.7.2017 (1.16)
   - bugfix:     31_TradfriGroup: no more warnings ("smartmatch") @ FHEM startup
