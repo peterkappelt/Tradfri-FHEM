@@ -164,24 +164,15 @@ sub TradfriDevice_Get($@) {
 }
 
 sub TradfriDevice_Set($@) {
-	my ($hash, @param) = @_;
+	my ($hash, $name, $opt, @param) = @_;
 	
-	return '"set TradfriDevice" needs at least one argument' if (int(@param) < 2);
+	return '"set TradfriDevice" needs at least one argument' unless(defined($opt));
 
-	my $argcount = int(@param);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
 	my $value = join("", @param);
-	
-	if(!defined($TradfriDevice_sets{$opt})) {
-		my @cList = keys %TradfriDevice_sets;
-		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
-		my $dimvalueMax = 254;
-		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-
-		return "Unknown argument $opt, choose one of on off dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
-	}
+        
+        my $dimvalueMax = 254;
+	$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+	my $cmdList = "on off dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
 	
 	$TradfriDevice_sets{$opt} = $value;
 
@@ -196,14 +187,14 @@ sub TradfriDevice_Set($@) {
 
 		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
 	}elsif($opt eq "dimvalue"){
-		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
+		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
 		
 		my $dimvalue = int($value);
 		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
 		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");
 	}elsif($opt eq "color"){
-		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
+		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
 		
 		my $rgb;
 
@@ -218,9 +209,9 @@ sub TradfriDevice_Set($@) {
 		}
 	
 		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "color::$rgb");
+	}else{
+		return SetExtensions($hash, $cmdList, $name, $opt, @param);
 	}
-
-	return undef;
 }
 
 
