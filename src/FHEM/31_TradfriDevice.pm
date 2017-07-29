@@ -19,6 +19,47 @@ my %TradfriDevice_sets = (
 	'color'		=> '',
 );
 
+my %dim_values = (
+   0 => "dim06%",
+   1 => "dim12%",
+   2 => "dim18%",
+   3 => "dim25%",
+   4 => "dim31%",
+   5 => "dim37%",
+   6 => "dim43%",
+   7 => "dim50%",
+   8 => "dim56%",
+   9 => "dim62%",
+  10 => "dim68%",
+  11 => "dim75%",
+  12 => "dim81%",
+  13 => "dim87%",
+  14 => "dim93%",
+);
+
+#get the on state of the device depending on the dimm value
+sub stateString{
+	if($_[0] == 0){
+		return 'off';
+	}elsif($_[0] >= 99){
+		return 'on';
+	}else{
+		return "dim$_[0]%";
+	}
+}
+
+sub setBrightness($$){
+	my ($hash, $dimpercent) = @_;
+	
+	my $dimvalue = int($dimpercent * 2.54 + 0.5);
+
+	readingsSingleUpdate($hash, "dimvalue", $dimvalue, 1);
+	readingsSingleUpdate($hash, "pct", $dimpercent, 1);
+	$hash->{STATE} = stateString($dimpercent);
+
+	return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");	
+}
+
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
@@ -47,6 +88,9 @@ sub TradfriDevice_Define($$) {
    
 	$hash->{name}  = $param[0];
 	$hash->{deviceAddress} = $param[2];
+
+	$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
+	$attr{$hash->{name}}{devStateIcon} = '{(TradfriDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 
 	#reverse search, for Parse
 	$modules{TradfriDevice}{defptr}{$hash->{deviceAddress}} = $hash;
@@ -100,11 +144,27 @@ sub TradfriDevice_Parse ($$){
 	#check if device with the id exists
 	if(my $hash = $modules{TradfriDevice}{defptr}{$messageDeviceID}) 
 	{
+		# the path returned "Not Found" -> unknown resource, but this message still suits for this device
+		if($parts[2] eq "Not Found"){
+			$hash->{STATE} = "NotFound";
+			return $hash->{name};
+		}
+
+		#parse the JSON data
+		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+		if($@){
+			return undef; #the string was probably not valid JSON
+		}
+
 		my $manufacturer = $jsonData->{'manufacturer'} || '';
 		my $type = $jsonData->{'type'} || '';
 		my $dimvalue = $jsonData->{'dimvalue'} || '0';
-		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
+		my $dimpercent = int($dimvalue / 2.54 + 0.5);
+		$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+		my $state = 'off';
+		if($jsonData->{'onoff'} || '0'){
+			$state = stateString($dimpercent);
+		}
 		my $name = $jsonData->{'name'} || '';
 		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
 		my $reachableState = $jsonData->{'reachabilityState'} || '';
@@ -114,6 +174,7 @@ sub TradfriDevice_Parse ($$){
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+		readingsBulkUpdateIfChanged($hash, 'pct', $dimpercent, 1);
 		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
 		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
 		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
@@ -124,12 +185,24 @@ sub TradfriDevice_Parse ($$){
 		readingsBulkUpdateIfChanged($hash, 'color', $color, 1);
 		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
 		readingsEndUpdate($hash, 1);
+	
+		$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
+		$attr{$hash->{name}}{devStateIcon} = '{(TradfriDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 		
 		#return the appropriate device's name
-		return $hash->{NAME}; 
+		return $hash->{name}; 
 	}
 	
 	return undef;
+}
+
+sub TradfriDevice_devStateIcon($){
+	my ($name) = @_;
+	my $pct = ReadingsVal($name,"pct","100");
+	my $s = $dim_values{int($pct/7)};
+	$s="on" if( $pct eq "100" );
+	$s="off" if( $pct eq "0" );
+	return ".*:$s:toggle";
 }
 
 sub TradfriDevice_Get($@) {
@@ -172,27 +245,37 @@ sub TradfriDevice_Set($@) {
         
         my $dimvalueMax = 254;
 	$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-	my $cmdList = "on off dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
+	my $cmdList = "on off pct:colorpicker,BRI,0,1,100 dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
 	
 	$TradfriDevice_sets{$opt} = $value;
 
+	if ($opt eq "toggle") {
+		$opt = (ReadingsVal($hash->{name}, 'pct', 0) == 0) ? "on" : "off";
+	}
+
 	if($opt eq "on"){
 		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'on';
+		my $dimpercent = ReadingsVal($hash->{name}, 'dimvalue', 254);
+		$dimpercent = int($dimpercent / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::1');
+		setBrightness($hash,$dimpercent);
 	}elsif($opt eq "off"){
 		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'off';
+		$hash->{STATE} = stateString(0);
+                readingsSingleUpdate($hash, "pct", 0, 1);
 
 		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
 	}elsif($opt eq "dimvalue"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
 		
-		my $dimvalue = int($value);
-		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+		my $dimpercent = int($value);
+		$dimpercent = int($value / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");
+		setBrightness($hash,$dimpercent);
+	}elsif($opt eq "pct"){
+		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 100!'  if ! @param;
+	
+		setBrightness($hash,int($value));
 	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
 		
@@ -213,7 +296,6 @@ sub TradfriDevice_Set($@) {
 		return SetExtensions($hash, $cmdList, $name, $opt, @param);
 	}
 }
-
 
 sub TradfriDevice_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
@@ -322,6 +404,9 @@ sub TradfriDevice_Attr(@) {
               <li><i>dimvalue</i><br>
                   The brightness that is set for this device. It is a integer in the range of 0 to 100/ 254.<br>
                   The greatest dimvalue depends on the attribute "usePercentDimming", see below.</li>
+              <li><i>pct</i><br>
+                  The brightness that is set for this device in percent.
+              </li>
               <li><i>lastSeen</i><br>
                   A timestamp string, like "Wed, 12 Jul 2017 14:32:06 GMT". I haven't understand the mechanism behind it yet.<br>
                   Communication with the device won't update the lastSeen-timestamp - so I don't get the point of it. This needs some more investigation.</li>
