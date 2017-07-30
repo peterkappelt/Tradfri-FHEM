@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.3
+# @version 1.16.dev-cf.4
 
 package main;
 use strict;
@@ -9,6 +9,7 @@ use Data::Dumper;
 use JSON;
 
 use constant{
+	PATH_DEVICE_ROOT =>		'/15001',
 	PATH_GROUP_ROOT =>		'/15004',
 	PATH_MOODS_ROOT =>		'/15005',
 };
@@ -69,6 +70,7 @@ my %TradfriGroup_sets = (
 # }
 
 #this hash will be filled with known moods, in the form 'moodname' => mood-id
+#@todo this needs to be stored in $hash
 my %moodsKnown = ();
 
 #subs, that define command to control a group
@@ -165,10 +167,27 @@ sub dataGetGroupCreatedAt{
 	return $_[0]->{9002};
 }
 
+#get the id of the mood that is currently active
+#pass decoded JSON data of /15004/group-id 
+sub dataGetGroupMood{
+	return $_[0]->{9039};
+}
+
 #get the user defined name of a mood
 #pass decoded JSON data of /15005/group-id/mood-id
 sub dataGetMoodName{
 	return $_[0]->{9001};
+}
+
+#write a path that needs to be observed to the Gateway's observe cache
+#IOWrite isn't possible because it only works if the IODev is opened, but we need to write to the Gateway Device's cache even if it is closed
+#@todo check if a IODev is assigned
+sub StartObservation($$){
+	my ($hash, $path) = @_;
+
+	no strict "refs";
+	&{$modules{$hash->{IODev}->{TYPE}}{StartObserveFn}}($hash->{IODev}, $path);
+	use strict "refs";
 }
 
 sub TradfriGroup_Initialize($) {
@@ -181,6 +200,7 @@ sub TradfriGroup_Initialize($) {
 	$hash->{AttrFn}     = 'TradfriGroup_Attr';
 	$hash->{ReadFn}     = 'TradfriGroup_Read';
 	$hash->{ParseFn}	= 'TradfriGroup_Parse';
+	$hash->{ParseDeviceUpdateFn} = 'TradfriGroup_ParseDeviceUpdate';
 
 	$hash->{Match} = '^observedUpdate\|coaps:\/\/[^\/]*\/15004';
 
@@ -206,7 +226,7 @@ sub TradfriGroup_Define($$) {
 	AssignIoPort($hash);
 
 	#start observing the coap resource, so the module will be informed about status updates
-	IOWrite($hash, 'observeStart', PATH_GROUP_ROOT . "/" . $hash->{groupAddress}, '');
+	StartObservation($hash, PATH_GROUP_ROOT . "/" . $hash->{groupAddress});
 
 	#@todo shall the moods get updated here?
 	TradfriGroup_Get($hash, $hash->{name}, 'moods');
@@ -220,10 +240,72 @@ sub TradfriGroup_Undef($$) {
 	return undef;
 }
 
+sub TradfriGroup_ParseDeviceUpdate($$$){
+	my ($hash, $hash_iodev, $path) = @_;
+
+	#called once a device (no matter if it is a member of the groud) was updated. 
+	#path is /15001/device-id
+
+	#@todo check, if $hash_iodev fits to the iodev that this instance uses
+
+	my ($deviceID) = ($path =~ /(?:\/15001\/)([0-9]*)/);
+
+	#check if the id is a member of this group
+	if(defined($deviceID) && grep(/^$deviceID$/, @{$hash->{helper}{memberDevices}})){
+		my $brightnessTotal = 0;		#sum of all brightnesses
+		my $brightnessOn = 0;			#sum of the brightnesses of the devices that are on
+		my $onDeviceCount = 0;		#number of devices that are on
+		my $deviceCount = 0;		#number of iterated devices
+
+		#following behavior:
+		#if all devices are off the brightness is the average of all set brightnesses (of the devices that are turned off)
+		#if at least one device is one, the brightness ist the average of the brightnesses of the devices that are turned on
+
+		#iterate through all devices that are member of this group and set the variables
+		for(my $i = 0; $i < int(@{$hash->{helper}{memberDevices}}); $i++){
+			my $memberDeviceID = $hash->{helper}{memberDevices}[$i];			#the id of the member device
+
+			#skip if there is no record in cache
+			if(!exists($hash->{IODev}->{helper}{observeCache}{"/15001/$memberDeviceID"})){
+				next;
+			}
+
+			#only handle if all of the following is true
+			if(
+				exists($hash->{IODev}->{helper}{observeCache}{"/15001/$memberDeviceID"}->{'state'}) &&			#a state is defined for the member device
+				($hash->{IODev}->{helper}{observeCache}{"/15001/$memberDeviceID"}->{'state'} eq 'OK') &&		#the record is marked as OK
+				exists($hash->{IODev}->{helper}{observeCache}{"/15001/$memberDeviceID"}->{3311}[0]->{5850}) &&	#it has a record for on/off state (i.e. it isn't a dimmer)
+				exists($hash->{IODev}->{helper}{observeCache}{"/15001/$memberDeviceID"}->{3311}[0]->{5851})		#it has a record for brightness (i.e. it isn't a dimmer)
+			){
+				my $deviceJSONInfo = $hash->{IODev}->{helper}{observeCache}{"/15001/$memberDeviceID"};
+				my $brightness = $deviceJSONInfo->{3311}[0]->{5851};
+				my $onOff = $deviceJSONInfo->{3311}[0]->{5850};
+
+				$onDeviceCount++ if($onOff);				#increment onDeviceCount when the device is on
+				$brightnessOn += $brightness if($onOff);	#add the current brightness to brightnessOn when its on
+				$brightnessTotal += $brightness;			#accumulate all brightnesses
+				$deviceCount++;								#all valid devices
+			}
+		}
+
+		my $state = $onDeviceCount > 0 ? 'on':'off';
+		my $dimvalue = 0;
+		$dimvalue = $brightnessTotal / $deviceCount if ($onDeviceCount == 0) && ($deviceCount > 0);
+		$dimvalue = $brightnessOn / $onDeviceCount if($onDeviceCount > 0);
+
+		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+
+		readingsBeginUpdate($hash);
+		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
+		readingsEndUpdate($hash, 1);
+	}
+}
+
 sub TradfriGroup_Parse($$){
 	my ($io_hash, $message) = @_;
 	
-	#the message contains 'coapObserveStart|coapPath|data' -> split it by the pipe character
+	#the message contains 'observedUpdate|coapPath|data' -> split it by the pipe character
 	my @parts = split('\|', $message);
 
 	if(int(@parts) < 3){
@@ -247,25 +329,36 @@ sub TradfriGroup_Parse($$){
 		#parse the JSON data
 		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
 		if($@){
-			return undef; #the string was probably not valid JSON
+			return $hash->{NAME}; #the string was probably not valid JSON
 		}
-
+		#Log(0, $parts[2]);
 		my $createdAt = FmtDateTimeRFC1123(dataGetGroupCreatedAt($jsonData));
 		my $name = dataGetGroupName($jsonData);
 		my $memberArray = dataGetGroupMembers($jsonData);
 		my $members = join(' ', @{$memberArray});
-		my $dimvalue = dataGetGroupBrightness($jsonData);
-		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = dataGetGroupOnOff($jsonData) ? 'on':'off';
+		my $mood = dataGetGroupMood($jsonData);
+		#my $dimvalue = dataGetGroupBrightness($jsonData);
+		#$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+		#my $state = dataGetGroupOnOff($jsonData) ? 'on':'off';
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
 		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
 		readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
-		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
-		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
+		readingsBulkUpdateIfChanged($hash, 'mood', $mood, 1);
+		#updated in a device-based algorithm
+		#readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+		#readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
 		readingsEndUpdate($hash, 1);
+
+		$hash->{helper}{memberDevices} = [@{$memberArray}];
 		
+		#@todo -> not good, we restart observing here every time
+		#make sure that we are observing each slave-device
+		for(my $i = 0; $i < scalar(@{$memberArray}); $i++){
+			StartObservation($hash, PATH_DEVICE_ROOT . "/" . ${$memberArray}[$i]);
+		}
+
 		#return the appropriate group's name
 		return $hash->{NAME}; 
 	}
@@ -300,6 +393,7 @@ sub TradfriGroup_Get($@) {
 
 		return Dumper($jsonData);
 	}elsif($opt eq 'moods'){
+		#Log(0, "update moods");
 		my $jsonText = IOWrite($hash, 'get', PATH_MOODS_ROOT . "/" . $hash->{groupAddress}, '');
 
 		if(!defined($jsonText)){
@@ -309,6 +403,7 @@ sub TradfriGroup_Get($@) {
 		#parse the JSON data
 		my $moodIDList = eval{ JSON->new->utf8->decode($jsonText) };
 		if(($@) || (ref($moodIDList) ne 'ARRAY')){
+			Log(0, "unkw json" . $jsonText);
 			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
 		}
 

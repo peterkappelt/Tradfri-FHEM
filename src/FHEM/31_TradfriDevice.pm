@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.3
+# @version 1.16.dev-cf.4
 
 package main;
 use strict;
@@ -227,6 +227,17 @@ sub dataGetDeviceColor{
 	return 0;
 }
 
+#write a path that needs to be observed to the Gateway's observe cache
+#IOWrite isn't possible because it only works if the IODev is opened, but we need to write to the Gateway Device's cache even if it is closed
+#@todo check if a IODev is assigned
+sub StartObservation($$){
+	my ($hash, $path) = @_;
+
+	no strict "refs";
+	&{$modules{$hash->{IODev}->{TYPE}}{StartObserveFn}}($hash->{IODev}, $path);
+	use strict "refs";
+}
+
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
@@ -263,7 +274,7 @@ sub TradfriDevice_Define($$) {
 
 	#start observing the coap resource, so the module will be informed about status updates
 	#@todo stop observing, when deleting module, or stopping FHEM
-	IOWrite($hash, 'observeStart', PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress}, '');
+	StartObservation($hash, PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress});
 
 	return undef;
 }
@@ -277,7 +288,7 @@ sub TradfriDevice_Undef($$) {
 sub TradfriDevice_Parse ($$){
 	my ($io_hash, $message) = @_;
 	
-	#the message contains 'coapObserveStart|coapPath|data' -> split it by the pipe character
+	#the message contains 'observedUpdate|coapPath|data' -> split it by the pipe character
 	my @parts = split('\|', $message);
 
 	if(int(@parts) < 3){
@@ -301,7 +312,7 @@ sub TradfriDevice_Parse ($$){
 		#parse the JSON data
 		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
 		if($@){
-			return undef; #the string was probably not valid JSON
+			return $hash->{NAME}; #the string was probably not valid JSON
 		}
 
 		my $manufacturer = dataGetDeviceManufacturer($jsonData);
@@ -328,7 +339,7 @@ sub TradfriDevice_Parse ($$){
 		readingsBulkUpdateIfChanged($hash, 'color', $color, 1);
 		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
 		readingsEndUpdate($hash, 1);
-		
+
 		#return the appropriate device's name
 		return $hash->{NAME}; 
 	}
