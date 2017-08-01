@@ -20,6 +20,31 @@ my %TradfriGroup_sets = (
 	'mood'		=> '',
 );
 
+#get the on state of the group depending on the dimm value
+sub TradfriGroup_stateString($){
+        my ($value) = @_;
+        if($value <= 0){
+                return 'off';
+        }elsif($value >= 99){
+                return 'on';
+        }else{
+                return "dim$value%";
+        }
+}
+
+sub TradfriGroup_setBrightness($$){
+        my ($hash, $dimpercent) = @_;
+        
+        my $dimvalue = int($dimpercent * 2.54 + 0.5);
+
+        my ($coapPath, $coapData) = cmdSetGroupBrightness($hash->{groupAddress}, $dimvalue);
+        readingsSingleUpdate($hash, "dimvalue", $dimvalue, 1);
+        readingsSingleUpdate($hash, "pct", $dimpercent, 1);
+        $hash->{STATE} = TradfriGroup_stateString($dimpercent);
+                
+	return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "dimvalue::$dimvalue");
+}
+
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
 
@@ -48,6 +73,9 @@ sub TradfriGroup_Define($$) {
    
 	$hash->{name}  = $param[0];
 	$hash->{groupAddress} = $param[2];
+
+	$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
+        $attr{$hash->{name}}{devStateIcon} = '{(TradfriGroup_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 
 	#reverse search, for Parse
 	$modules{TradfriGroup}{defptr}{$hash->{groupAddress}} = $hash;
@@ -119,14 +147,19 @@ sub TradfriGroup_Parse($$){
 			my $name = $jsonData->{'name'} || '';
 			my $members = JSON->new->pretty->encode($jsonData->{'members'});
 			my $dimvalue = $jsonData->{'dimvalue'} || '0';
-			$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-			my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
+			my $dimpercent = int($dimvalue / 2.54 + 0.5);
+			$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+			my $state = 'off';
+                	if($jsonData->{'onoff'} || '0'){
+                        	$state = TradfriGroup_stateString($dimpercent);
+                	}
 
 			readingsBeginUpdate($hash);
 			readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
 			readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
 			readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
 			readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+			readingsBulkUpdateIfChanged($hash, 'pct', $dimpercent, 1);
 			readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
 			readingsEndUpdate($hash, 1);
 		}elsif('moodList' eq $parts[0]){
@@ -138,12 +171,24 @@ sub TradfriGroup_Parse($$){
 				$hash->{helper}{moods}->{$_->{name}} = $_;
 			}
 		}
+
+		$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
+                $attr{$hash->{name}}{devStateIcon} = '{(TradfriGroup_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 		
 		#return the appropriate group's name
 		return $hash->{NAME}; 
 	}
 
 	return undef;
+}
+
+sub TradfriGroup_devStateIcon($){
+        my ($name) = @_;
+        my $pct = ReadingsVal($name,"pct","100");
+        my $s = $dim_values{int($pct/7)};
+        $s="on" if( $pct eq "100" );
+        $s="off" if( $pct eq "0" );
+        return ".*:$s:toggle";
 }
 
 sub TradfriGroup_Get($@) {
@@ -166,63 +211,52 @@ sub TradfriGroup_Get($@) {
 }
 
 sub TradfriGroup_Set($@) {
-	my ($hash, @param) = @_;
+	my ($hash, $name, $opt, @param) = @_;
 	
-	return '"set TradfriGroup" needs at least one argument' if (int(@param) < 2);
+	return '"set TradfriGroup" needs at least one argument' unless(defined($opt));
 
-	my $argcount = int(@param);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
 	my $value = join("", @param);
-	
-	if(!defined($TradfriGroup_sets{$opt})) {
-		my @cList = keys %TradfriGroup_sets;
-		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
 
-		#dynamic option: max dimvalue
-		my $dimvalueMax = 254;
-		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+	#dynamic option: moods
+	my $moodsList = join(",", map { "$_" } keys %{$hash->{helper}{moods}});
 
-		#dynamic option: moods
-		my $moodsList = join(",", map { "$_" } keys %{$hash->{helper}{moods}});
-
-		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood:$moodsList";
-	}
+	my $dimvalueMax = 254;
+        $dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+        my $cmdList = "on off pct:colorpicker,BRI,0,1,100 dimvalue:slider,0,1,$dimvalueMax mood:$moodsList";
 	
 	$TradfriGroup_sets{$opt} = $value;
 
+	if ($opt eq "toggle") {
+                $opt = (ReadingsVal($hash->{name}, 'pct', 0) == 0) ? "on" : "off";
+        }
+
 	if($opt eq "on"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'on';
-		
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, 'onoff::1');
-	}elsif($opt eq "off"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'off';
-		
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, 'onoff::0');
-	}elsif($opt eq "dimvalue"){
-		return '"set TradfriGroup dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
+                my $dimpercent = ReadingsVal($hash->{name}, 'dimvalue', 254);
+                $dimpercent = int($dimpercent / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		my $dimvalue = int($value);
-		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+                TradfriGroup_setBrightness($hash,$dimpercent);
+        }elsif($opt eq "off"){
+                #@todo state shouldn't be updated here?!
+                $hash->{STATE} = TradfriGroup_stateString(0);
+                readingsSingleUpdate($hash, "pct", 0, 1);
+		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
+        }elsif($opt eq "dimvalue"){
+                return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
 
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "dimvalue::$dimvalue");
-	}elsif($opt eq "mood"){
-		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
+                my $dimpercent = int($value);
+                $dimpercent = int($value / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		if(!($value =~ /[1-9]+/)){
-		 	#user wrote a string -> a mood name
-		 	if(exists($hash->{helper}{moods}->{"$value"})){
-		 		$value = $hash->{helper}{moods}->{"$value"}->{moodid};
-		 	}else{
-	 			return "Unknown mood!";
-		 	}
-		}
+                TradfriGroup_setBrightness($hash,$dimpercent);
+        }elsif($opt eq "pct"){
+                return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 100!'  if ! @param;
 
+                TradfriGroup_setBrightness($hash,int($value));
+        }elsif($opt eq "mood"){
+		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ! @param;
 		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "mood::$value");
-	}
+	}else{
+                return SetExtensions($hash, $cmdList, $name, $opt, @param);
+        }
 
 	return undef;
 }
