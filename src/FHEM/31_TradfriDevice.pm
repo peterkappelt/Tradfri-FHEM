@@ -38,7 +38,7 @@ my %dim_values = (
 );
 
 #get the on state of the device depending on the dimm value
-sub stateString($){
+sub TradfriDevice_stateString($){
 	my ($value) = @_;
 	if($value <= 0){
 		return 'off';
@@ -49,15 +49,14 @@ sub stateString($){
 	}
 }
 
-sub setBrightness($$){
+sub TradfriDevice_setBrightness($$){
 	my ($hash, $dimpercent) = @_;
 	
 	my $dimvalue = int($dimpercent * 2.54 + 0.5);
-
 	readingsSingleUpdate($hash, "dimvalue", $dimvalue, 1);
 	readingsSingleUpdate($hash, "pct", $dimpercent, 1);
-	$hash->{STATE} = stateString($dimpercent);
 
+	$hash->{STATE} = TradfriDevice_stateString($dimpercent);
 	return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");	
 }
 
@@ -164,7 +163,7 @@ sub TradfriDevice_Parse ($$){
 		$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 		my $state = 'off';
 		if($jsonData->{'onoff'} || '0'){
-			$state = stateString($dimpercent);
+			$state = TradfriDevice_stateString($dimpercent);
 		}
 		my $name = $jsonData->{'name'} || '';
 		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
@@ -259,10 +258,10 @@ sub TradfriDevice_Set($@) {
 		my $dimpercent = ReadingsVal($hash->{name}, 'dimvalue', 254);
 		$dimpercent = int($dimpercent / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		setBrightness($hash,$dimpercent);
+		TradfriDevice_setBrightness($hash,$dimpercent);
 	}elsif($opt eq "off"){
 		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = stateString(0);
+		$hash->{STATE} = TradfriDevice_stateString(0);
                 readingsSingleUpdate($hash, "pct", 0, 1);
 
 		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
@@ -272,11 +271,11 @@ sub TradfriDevice_Set($@) {
 		my $dimpercent = int($value);
 		$dimpercent = int($value / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		setBrightness($hash,$dimpercent);
+		TradfriDevice_setBrightness($hash,$dimpercent);
 	}elsif($opt eq "pct"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 100!'  if ! @param;
 	
-		setBrightness($hash,int($value));
+		TradfriDevice_setBrightness($hash,int($value));
 	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
 		
