@@ -38,13 +38,14 @@ my %dim_values = (
 );
 
 #get the on state of the device depending on the dimm value
-sub stateString{
-	if($_[0] == 0){
+sub stateString($){
+	my ($value) = @_;
+	if($value <= 0){
 		return 'off';
-	}elsif($_[0] >= 99){
+	}elsif($value >= 99){
 		return 'on';
 	}else{
-		return "dim$_[0]%";
+		return "dim$value%";
 	}
 }
 
