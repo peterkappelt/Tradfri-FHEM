@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.4
+# @version 1.16.dev-cf.5
 
 package main;
 use strict;
@@ -8,12 +8,8 @@ use warnings;
 use Data::Dumper;
 use JSON;
 
-use constant{
-	PATH_DEVICE_ROOT =>		'/15001',
-};
-
 my %TradfriDevice_gets = (
-	'deviceInfo'	=> ' ',
+#	'deviceInfo'	=> ' ',
 );
 
 my %TradfriDevice_sets = (
@@ -22,221 +18,6 @@ my %TradfriDevice_sets = (
 	'dimvalue'	=> '',
 	'color'		=> '',
 );
-
-# The output of the path PATH_DEVICE_ROOT/LAMP_ADDRESS looks like follows. (for bulbs, that can not change color temperature)
-# We can just write single values to change the attributes
-
-# $VAR1 = {
-		  # '9020' => 1492322690,			-> last seen
-		  # '9003' => 65537,				-> id
-		  # '9054' => 0,					-> ota update state?
-		  # '3311' => [
-					  # {
-						# '9003' => 0,		-> id?
-						# '5850' => 0,		-> on/off
-						# '5851' => 91		-> brightness (dimmer)
-					  # }
-					# ],
-		  # '9019' => 1,								-> reachable state
-		  # '3' => {
-				   # '0' => 'IKEA of Sweden',			-> manufacturer	
-				   # '2' => '',
-				  # '3' => '1.1.1.0-5.7.2.0',			-> sw version
-				   # '6' => 1,
-				   # '1' => 'TRADFRI bulb E27 opal 1000lm'		-> product name
-				 # },
-		  # '9001' => 'Fenster Links',			-> user defined name
-		  # '9002' => 1492280964,				-> created at
-		  # '5750' => 2							-> type
-		# };
-
-# for bulbs, that change color:
-#$VAR1 = { 
-#          '9019' => 1, 											-> reachability state
-#          '3' => { 
-#                   '6' => 1, 
-#                   '0' => 'IKEA of Sweden', 						-> manufacturer
-#                   '3' => '1.1.1.1-5.7.2.0', 						-> software version
-#                   '1' => 'TRADFRI bulb E14 WS opal 400lm', 		-> product name
-#                   '2' => '' 
-#                 }, 
-#          '5750' => 2, 											-> type: bulb?, but no information about the type		
-#          '3311' => [ 												-> light information
-#                      { 
-#                        '5850' => 1, 								-> on/ off
-#                        '5710' => 24694, 							-> color_y (CIE1931 model, max 65535)
-#                        '5707' => 0, 								
-#                        '5851' => 7, 								-> dim value (brightness)
-#                        '5711' => 0, 								
-#                        '5709' => 24930, 							-> color_x (CIE1931 model, max 65535)
-#                        '9003' => 0, 								-> instance id?
-#                        '5708' => 0, 
-#                        '5706' => 'f5faf6' 						-> rgb color code
-#                      } 
-#                    ], 
-#          '9001' => 'TRADFRI bulb E14 WS opal 400lm', 				-> user defined name
-#          '9002' => 1492802359, 									-> paired/ created at
-#          '9020' => 1492863561, 									-> last seen				
-#          '9003' => 65539, 										-> device id
-#          '9054' => 0 												-> OTA update state
-#        }; 
-
-
-#subs, that define command to control a device
-# cmdSetDevice* functions will return a string, containing the last part of the CoAP path (like /15001/65537) and a string containing the JSON data that shall be written
-# dataGetDevice* functions will return the respective data, they expect a decoded JSON hash with the device information
-
-#get the command and the path to turn the device on or off
-#this requires two arguments: the lamp address and the on/off state (as 0 or 1)
-sub cmdSetDeviceOnOff{
-		my $lampAddress = $_[0];
-		my $onOffState = $_[1];
-
-		my $jsonState = $onOffState ? 1:0;
-
-		my $command = {
-				'3311' => [
-						{
-								'5850' => $jsonState
-						}
-				]
-		};
-
-		my $jsonString = JSON->new->utf8->encode($command);
-
-		return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
-}
-
-#get the command and the path to set the device's brightness
-#args:
-# - lamp address
-# - brightness (0 - 254)
-sub cmdSetDeviceBrightness{
-		my $lampAddress = $_[0];
-		my $brightness = $_[1];
-
-		if($brightness > 254){
-				$brightness = 254;
-		}
-		if($brightness < 0){
-				$brightness = 0;
-		}
-
-		my $command = {
-				'3311' => [
-						{
-								'5851' => $brightness
-						}
-				]
-		};
-
-		my $jsonString = JSON->new->utf8->encode($command);
-
-		return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
-}
-
-#get the command and the path to set the device's color
-#args:
-#	- the lamp address,
-#	- rgb color string, hexadecimal notation
-#
-# ikea uses the following combinations:
-# F1E0B5 for standard
-# F5FAF6 for cold
-# EFD275 for warm
-sub cmdSetDeviceColorRGB{
-	my $lampAddress = $_[0];
-	my $rgb = $_[1];
-
-	#caution: we need an hash reference here, so it must be defined with $
-	my $command = {
-			'3311' => [
-					{
-							'5706' => $rgb,
-					}
-			]
-	};
-
-	my $jsonString = JSON->new->utf8->encode($command);
-
-	return (PATH_DEVICE_ROOT . "/$lampAddress", $jsonString);
-}
-
-
-#get the device typpe
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceType{
-	return $_[0]->{3}{1};
-}
-
-#get the device's manufacturer
-#pass decoded JSON data of /15001/device-id
-sub dataGetDeviceManufacturer{
-	return $_[0]->{3}{0};
-}
-
-#get the user defined name of the device
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceName{
-	return $_[0]->{9001};
-}
-
-#get the device's brightness
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceBrightness{
-	return $_[0]->{3311}[0]->{5851};
-}
-
-#get the device's on/ off state
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceOnOff{
-	return $_[0]->{3311}[0]->{5850};
-}
-
-#get the timestamp, when the device was created
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceCreatedAt{
-	return $_[0]->{9002};
-}
-
-#get the  software version of the device
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceSoftwareVersion{
-	return $_[0]->{3}{3};
-}
-
-#get, whether the device is reachable
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceReachabilityState{
-	return $_[0]->{9019};
-}
-
-#get the timestamp, when the device was last seen by the gateway
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceLastSeen{
-	return $_[0]->{9020};
-}
-
-#get the device color code
-#if the device cannot change its color, this function returns 0
-#pass decoded JSON data of /15001/device-id 
-sub dataGetDeviceColor{
-	if(exists($_[0]->{3311}[0]->{5706})){
-		return $_[0]->{3311}[0]->{5706};
-	}
-	return 0;
-}
-
-#write a path that needs to be observed to the Gateway's observe cache
-#IOWrite isn't possible because it only works if the IODev is opened, but we need to write to the Gateway Device's cache even if it is closed
-#@todo check if a IODev is assigned
-sub StartObservation($$){
-	my ($hash, $path) = @_;
-
-	no strict "refs";
-	&{$modules{$hash->{IODev}->{TYPE}}{StartObserveFn}}($hash->{IODev}, $path);
-	use strict "refs";
-}
 
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
@@ -249,7 +30,7 @@ sub TradfriDevice_Initialize($) {
 	$hash->{ReadFn}     = 'TradfriDevice_Read';
 	$hash->{ParseFn}	= 'TradfriDevice_Parse';
 
-	$hash->{Match} = '^observedUpdate\|coaps:\/\/[^\/]*\/15001';
+	$hash->{Match} = '^subscribedDeviceUpdate::';
 
 	$hash->{AttrList} =
 		"usePercentDimming:1,0 "
@@ -274,7 +55,7 @@ sub TradfriDevice_Define($$) {
 
 	#start observing the coap resource, so the module will be informed about status updates
 	#@todo stop observing, when deleting module, or stopping FHEM
-	StartObservation($hash, PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress});
+	IOWrite($hash, 0, 'subscribe', $hash->{deviceAddress});
 
 	return undef;
 }
@@ -285,47 +66,51 @@ sub TradfriDevice_Undef($$) {
 	return undef;
 }
 
+#messages look like this: (without newlines)
+# subscribedDeviceUpdate::device-id::{
+#    "lastSeenAt":1501407261,
+#    "createdAt":1492280964,
+#    "reachabilityState":1,
+#    "name":"Fenster Links",
+#    "dimvalue":200,
+#    "type":"TRADFRI bulb E27 opal 1000lm",
+#    "deviceid":65537,
+#    "version":"1.1.1.0-5.7.2.0",
+#    "manufacturer":"IKEA of Sweden",
+#    "onoff":0
+# }
 sub TradfriDevice_Parse ($$){
 	my ($io_hash, $message) = @_;
-	
-	#the message contains 'observedUpdate|coapPath|data' -> split it by the pipe character
-	my @parts = split('\|', $message);
+
+	my @parts = split('::', $message);
 
 	if(int(@parts) < 3){
 		#expecting at least three parts
 		return undef;
 	}
+	
+	#parse the JSON data
+	my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+	if($@){
+		return undef; #the string was probably not valid JSON
+	}
 
-	#$parts[1], the coapPath is build up like this: coaps://Ip-or-dns-of-gateway/15001/Id-of-device
-	#extract the device id with the following regex:
-	my ($temp, $msgDeviceId) = ($parts[1] =~ /(^coap.?:\/\/[^\/]*\/15001\/)([0-9]*)/);
+	my $messageDeviceID = $parts[1];
 
 	#check if device with the id exists
-	if(my $hash = $modules{TradfriDevice}{defptr}{$msgDeviceId}) 
+	if(my $hash = $modules{TradfriDevice}{defptr}{$messageDeviceID}) 
 	{
-		# the path returned "Not Found" -> unknown resource, but this message still suits for this device
-		if($parts[2] eq "Not Found"){
-			$hash->{STATE} = "NotFound";
-			return $hash->{NAME};
-		}
-
-		#parse the JSON data
-		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
-		if($@){
-			return $hash->{NAME}; #the string was probably not valid JSON
-		}
-
-		my $manufacturer = dataGetDeviceManufacturer($jsonData);
-		my $type = dataGetDeviceType($jsonData);
-		my $dimvalue = dataGetDeviceBrightness($jsonData);
+		my $manufacturer = $jsonData->{'manufacturer'} || '';
+		my $type = $jsonData->{'type'} || '';
+		my $dimvalue = $jsonData->{'dimvalue'} || '0';
 		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = dataGetDeviceOnOff($jsonData) ? 'on':'off';
-		my $name = dataGetDeviceName($jsonData);
-		my $createdAt = FmtDateTimeRFC1123(dataGetDeviceCreatedAt($jsonData));
-		my $reachableState = dataGetDeviceReachabilityState($jsonData);
-		my $lastSeen = FmtDateTimeRFC1123(dataGetDeviceLastSeen($jsonData));
-		my $color = dataGetDeviceColor($jsonData);
-		my $version = dataGetDeviceSoftwareVersion($jsonData);
+		my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
+		my $name = $jsonData->{'name'} || '';
+		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
+		my $reachableState = $jsonData->{'reachabilityState'} || '';
+		my $lastSeen = FmtDateTimeRFC1123($jsonData->{'lastSeenAt'} || '');
+		my $color = $jsonData->{'color'} || '';
+		my $version = $jsonData->{'version'} || '';
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
@@ -339,7 +124,7 @@ sub TradfriDevice_Parse ($$){
 		readingsBulkUpdateIfChanged($hash, 'color', $color, 1);
 		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
 		readingsEndUpdate($hash, 1);
-
+		
 		#return the appropriate device's name
 		return $hash->{NAME}; 
 	}
@@ -360,19 +145,19 @@ sub TradfriDevice_Get($@) {
 	}
 	
 	if($opt eq 'deviceInfo'){
-		my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress}, '');
+		# my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress}, '');
 
-		if(!defined($jsonText)){
-			return "Error while fetching device info!";
-		}
+		# if(!defined($jsonText)){
+		# 	return "Error while fetching device info!";
+		# }
 		
-		#parse the JSON data
-		my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
-		if($@){
-			return $jsonText; #the string was probably not valid JSON
-		}
+		# #parse the JSON data
+		# my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
+		# if($@){
+		# 	return $jsonText; #the string was probably not valid JSON
+		# }
 
-		return Dumper($jsonData);
+		# return Dumper($jsonData);
 	}
 
 	return $TradfriDevice_gets{$opt};
@@ -404,22 +189,19 @@ sub TradfriDevice_Set($@) {
 		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'on';
 
-		my ($coapPath, $coapData) = cmdSetDeviceOnOff($hash->{deviceAddress}, 1);
-		return IOWrite($hash, 'write', $coapPath, $coapData);
+		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::1');
 	}elsif($opt eq "off"){
 		#@todo state shouldn't be updated here?!
 		$hash->{STATE} = 'off';
 
-		my ($coapPath, $coapData) = cmdSetDeviceOnOff($hash->{deviceAddress}, 0);
-		return IOWrite($hash, 'write', $coapPath, $coapData);
+		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
 	}elsif($opt eq "dimvalue"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
 		
 		my $dimvalue = int($value);
 		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
-		my ($coapPath, $coapData) = cmdSetDeviceBrightness($hash->{deviceAddress}, $dimvalue);
-		return IOWrite($hash, 'write', $coapPath, $coapData);
+		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");
 	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
 		
@@ -435,8 +217,7 @@ sub TradfriDevice_Set($@) {
 			$rgb = $value;
 		}
 	
-		my ($coapPath, $coapData) = cmdSetDeviceColorRGB($hash->{deviceAddress}, $rgb);
-		return IOWrite($hash, 'write', $coapPath, $coapData);
+		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "color::$rgb");
 	}
 
 	return undef;

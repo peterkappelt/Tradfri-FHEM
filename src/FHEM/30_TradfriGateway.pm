@@ -1,22 +1,14 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.4
+# @version 1.16.dev-cf.5
 
 package main;
 use strict;
 use warnings;
 
-use IO::Select;
-
 require 'DevIo.pm';
 
-use constant{
-	PATH_DEVICE_ROOT =>		'/15001',
-	PATH_GROUP_ROOT =>		'/15004',
-	PATH_MOODS_ROOT =>		'/15005',
-};
-
 my %TradfriGateway_sets = (
-#	'reopen'	=> ' ',
+	#'reopen'	=> ' ',
 );
 
 my %TradfriGateway_gets = (
@@ -36,14 +28,10 @@ sub TradfriGateway_Initialize($) {
 	$hash->{WriteFn}	= 'TradfriGateway_Write';
 	$hash->{ReadyFn}	= 'TradfriGateway_Ready';
 
-	#custom function for logical devices to register themselves in the observe cache of the gateway
-	#IOWrite is not possible, it only works if the connection is opened
-	$hash->{StartObserveFn} = 'TradfriGateway_StartObserve';
-
 	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
 	$hash->{MatchList} = {
-			"1:TradfriDevice" => '^observedUpdate\|coaps:\/\/[^\/]*\/15001',
-			"2:TradfriGroup" => '^observedUpdate\|coaps:\/\/[^\/]*\/15004' ,
+			"1:TradfriDevice" => '^subscribedDeviceUpdate::',
+			"2:TradfriGroup" => '^subscribedGroupUpdate::' ,
 			};
 }
 
@@ -66,9 +54,6 @@ sub TradfriGateway_Define($$) {
 	# @todo make user settable
 	$hash->{DeviceName} = "localhost:1505";
 
-	# all paths that are observed and their last received value
-	$hash->{helper}{observeCache} = ();
-
 	if(int(@param) > 4){
 		#there was a fifth parameter
 		#it is the path to the coap client, add it to the environments path
@@ -78,7 +63,7 @@ sub TradfriGateway_Define($$) {
 
 	#open the socket connection
 	#@todo react to return code
-	my $ret = DevIo_OpenDev($hash, 0, "TradfriGateway_DeviceInit");
+	DevIo_OpenDev($hash, 0, "TradfriGateway_DeviceInit");
 
 	return undef;
 }
@@ -92,103 +77,64 @@ sub TradfriGateway_Undef($$) {
 sub TradfriGateway_DeviceInit($){
 	my $hash = shift;
 
-	#set the PSK
-	DevIo_SimpleWrite($hash, "setPSK|" . $hash->{gatewaySecret} . "\n", 2, 0);
+	#subscribe do all devices and groups
+	#@todo check, whether we this instance is the IODev of the device/ group
+	foreach my $deviceID ( keys %{$modules{TradfriDevice}{defptr}}){
+		TradfriGateway_Write($hash, 0, 'subscribe', $deviceID);
+	}
 
-	#start to observe all necessary resources
-	TradfriGateway_StartObserveAll($hash);
-
-	#init the data of all member groups
-	#perform a get
-	#@todo blocking call
 	foreach my $groupID ( keys %{$modules{TradfriGroup}{defptr}}){
-		my $groupData = TradfriGateway_Write($hash, 'get', '/15004/' . $groupID . '/', '');
-
-		#remove any left whitespace
-		$groupData =~ s/\r//g;
-		$groupData =~ s/\n//g;
-
-		#dispatch, like for a observe update
-		Dispatch($hash, 'observedUpdate|coaps://gw/15004/' . $groupID . '|' . $groupData, undef);
-
-		#start a mood update for the group
-		no strict "refs";
-		&{$modules{TradfriGroup}{GetFn}}($modules{TradfriGroup}{defptr}{$groupID}, $modules{TradfriGroup}{defptr}{$groupID}->{name}, 'moods');
-		use strict "refs";
+		TradfriGateway_Write($hash, 1, 'subscribe', $groupID);
 	}
 }
 
-#start to observe a specified path and handle the caching of the observed paths
-sub TradfriGateway_StartObserve($$){
-	my ( $hash, $path ) = @_;
 
-	#put the path to the "observeCache" -> if the connection dies, the coapObserveStart command needs to be called again.
-	if(!exists($hash->{helper}{observeCache}{"$path"})){
-		$hash->{helper}{observeCache}{"$path"} = undef;
-
-		#start observing immediatly, if connection is open
-		if($hash->{STATE} eq 'opened'){
-			Log(3, "[TradfriGateway] Start to observe path $path (start)");
-			DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $path . "\n", 2, 0);
-		}
-	}
-}
-
-#observe all resources, that are stored in the cache. A path is usually stored in the cache when the sub-device is initialized
-sub TradfriGateway_StartObserveAll($){
-	my ($hash) = @_;
-	
-	foreach my $observePath ( keys %{$hash->{helper}{observeCache}} ){
-		Log(3, "[TradfriGateway] Start to observe path $observePath (auto)");
-		DevIo_SimpleWrite($hash, "coapObserveStart|coaps://" . $hash->{gatewayAddress} . $observePath . "\n", 2, 0);
-		#sleep(1);
-	}
-}
-
-# a write command, that is dispatch from the logical module to here via IOWrite requires three arguments:
-# 1.: a method for the write command. The following values are allowed:
-#		- 'write' -> CoAP-PUT of specified data to a specified path
-#		- 'observeStart' -> start the observation of a specified path, argument #3 can be an empty string.
-#		- 'get' -> CoAP-GET from a specified path, argument #3 can be an empty string. This call is blocking, the call waits for an answer.
-# 2.: the incomplete coap path, like "/15001/65537". The first part of the path will be handled by this module
-# 3.: the payload data, for Tradfri as as JSON string
+# a write command, that is dispatch from the logical module to here via IOWrite requires at least two arguments:
+# - 1. Scope: 				Group (1) or Device (0)
+# - 2. Action	: 			A command:
+#								* list -> sets the readings groups/ devices
+#								* subscribe -> subscribe to updated of that specific device
+#								* set -> write a specific value to the group/ device
+# - 3. ID:					ID of the group or device
+# - 4. attribute::value		only for command set, attribute can be onoff, dimvalue, mood (groups only), color (devices only) or name
 sub TradfriGateway_Write ($@){
-	my ( $hash, @arguments) = @_;
+	my ( $hash, $groupOrDevice, $action, $id, $attrValue) = @_;
 	
-	if(int(@arguments < 3)){
+	if(!defined($groupOrDevice) && !defined($action)){
 		Log(1, "[TradfriGateway] Not enough arguments for IOWrite!");
 		return "Not enough arguments for IOWrite!";
 	}
-	
+
+	my $command = '';
+
+	#for cmd-buildup: decide on group/ device
+	if($groupOrDevice){
+		$command .= 'group::';
+	}else{
+		$command .= 'device::';
+	}
+
+	if($action eq 'list'){
+		$command .= 'list';
+	}elsif($action eq 'subscribe'){
+		#silently return if connection is open.
+		#at startup, every device/ group runs subscribe. If the connection isn't open, we do it later.
+		return if($hash->{STATE} ne 'opened');
+		$command .= "subscribe::$id";
+	}elsif($action eq 'set'){
+		$command .= "set::$id::$attrValue";
+	}else{
+		return "Unknown command: " . $command;
+	}
+
 	#@todo better check, if opened
 	if($hash->{STATE} ne 'opened'){
 		Log(1, "[TradfriGateway] Can't write, connection is not opened!");
 		return "Can't write, connection is not opened!";
 	}
 
-	if($arguments[0] eq 'write'){
-		Log(3, "[TradfriGateway] Put of $arguments[2] to $arguments[1]");
-		DevIo_SimpleWrite($hash, "coapPutJSON|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "|" . $arguments[2] . "\n", 2, 0);
-	}elsif($arguments[0] eq 'observeStart'){
-		TradfriGateway_StartObserve($hash, $arguments[1]);
-	}elsif($arguments[0] eq 'get'){
-		Log(0, "get: $arguments[1]");
-		#@todo check if there is already dat ato read -> call the read function first, before expecting it here
-		# this is a little dirty way to check for available data -> to be improved
-		my $sel = new IO::Select($hash->{TCPDev});
-		if($sel->can_read(0)){
-			Log(0, "andere msg in puffer");
-			TradfriGateway_Read($hash);
-		}
+	DevIo_SimpleWrite($hash, $command . "\n", 2, 0);
 
-		Log(0, "[TradfriGateway] Get from $arguments[1]");
-		my $getReturn = DevIo_Expect($hash, "coapGet|coaps://" . $hash->{gatewayAddress} . $arguments[1] . "\n", 30);
-		my @getReturnParts = split(/\|/, $getReturn);
-		return $getReturnParts[2] if int(@getReturnParts) >= 3;
-		return "UNDEF";
-	}
-
-	#@todo return code handling
 	return undef;
 }
 
@@ -214,49 +160,20 @@ sub TradfriGateway_Read ($){
 		$message =~ s/\r//g;
 		$message =~ s/\n//g;
 
+		#devices and groups
+		#@todo not as JSON array
+		if(($message ne '') && ((split(/::/, $message))[0] =~ /(?:group|device)List/)){
+			Log(0, $message);
+			if((split(/::/, $message))[0] eq 'deviceList'){
+				readingsSingleUpdate($hash, 'devices', (split(/::/, $message))[1], 1);
+			}
+			if((split(/::/, $message))[0] eq 'groupList'){
+				readingsSingleUpdate($hash, 'groups', (split(/::/, $message))[1], 1);
+			}
+		}
+
 		#dispatch the message if it isn't empty, only dispatch messages that come from an observe
-		if(($message ne '') && ((split(/\|/, $message))[0] eq 'observedUpdate')){
-			#decode the message here and store it in cache
-			#the message contains 'coapObserveStart|coapPath|data' -> split it by the pipe character
-			my @parts = split('\|', $message);
-
-			if(int(@parts) < 3){
-				#expecting at least three parts
-				#if there are not three parts, the message is invalid -> we do not even need to dispatch it
-				next;
-			}
-
-			#$parts[1], the coapPath is build up like this: coaps://Ip-or-dns-of-gateway/15001/Id-of-device
-			#extract the path after the Ip-Or-DNS part
-			my ($unused, $path) = ($parts[1] =~ /(^coap.?:\/\/[^\/]*\/)([0-9\/]*)/);
-			#re-append a '/' in front of the path
-			$path = '/' . $path;
-
-			#parse the JSON data
-			my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
-			if(!($@)){
-				#if there is some valid json, then put it into the cache
-				$jsonData->{'state'} = "OK";
-				$hash->{helper}{observeCache}{"$path"} = $jsonData;
-				$hash->{helper}{observeCache}{"$path"}->{'state'} = 'OK';
-			}else{
-				#no valid json, probably not found
-				$hash->{helper}{observeCache}{"$path"}->{'state'} = "Not Found";
-			}
-
-			#updates for devices get written to groups too, but in a own function
-			#first: check if the observe update was for a device, group updates get dispatched in the "old-fashioned" way
-			if($path =~ /^\/15001\/.*/){
-				#iterate through each definition of TradfriGroup
-				foreach my $TradfriGroup_id ( keys %{$modules{TradfriGroup}{defptr}}){
-					no strict "refs";
-					&{$modules{TradfriGroup}{ParseDeviceUpdateFn}}($modules{TradfriGroup}{defptr}{$TradfriGroup_id}, $hash, $path);
-					use strict "refs";
-				}
-			}
-
-			#Log(0, Dumper(\%observeCache));
-
+		if(($message ne '') && ((split(/::/, $message))[0] =~ /subscribed(?:Group|Device)Update/)){
 			Dispatch($hash, $message, undef);
 		}
 	}
@@ -281,61 +198,9 @@ sub TradfriGateway_Get($@) {
 	}
 	
 	if($opt eq 'deviceList'){
-		my $jsonText = TradfriGateway_Write($hash, 'get', PATH_DEVICE_ROOT, '');
-
-		if(!defined($jsonText)){
-			return "Error while fetching devices!";
-		}
-		
-		#parse the JSON data
-		my $deviceIDList = eval{ JSON->new->utf8->decode($jsonText) };
-		if($@){
-			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
-		}
-
-		my $returnUserString = "";
-
-		#@todo read the device info
-		for(my $i = 0; $i < scalar(@{$deviceIDList}); $i++){
-			$returnUserString .= "- " . 
-				${$deviceIDList}[$i] . 
-			#	": " . 
-			#	TradfriLib::getDeviceManufacturer($deviceInfo) .
-			#	" " .
-			#	TradfriLib::getDeviceType($deviceInfo) .
-			#	" (" .
-			#	TradfriLib::getDeviceName($deviceInfo) .
-			#	")" .
-				"\n";
-		}
-
-		return $returnUserString;
+		TradfriGateway_Write($hash, 0, 'list');
 	}elsif($opt eq 'groupList'){
-		my $jsonText = TradfriGateway_Write($hash, 'get', PATH_GROUP_ROOT, '');
-
-		if(!defined($jsonText)){
-			return "Error while fetching groups!";
-		}
-		
-		#parse the JSON data
-		my $groupIDList = eval{ JSON->new->utf8->decode($jsonText) };
-		if($@){
-			return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
-		}
-
-		my $returnUserString = "";
-
-		#@todo read group info
-		for(my $i = 0; $i < scalar(@{$groupIDList}); $i++){
-			$returnUserString .= "- " .
-				${$groupIDList}[$i] .
-				#": " .
-				#TradfriLib::getGroupName($groupInfo) . 
-				"\n";
-
-		}
-
-		return $returnUserString;
+		TradfriGateway_Write($hash, 1, 'list');
 	}
 
 	return $TradfriGateway_gets{$opt};

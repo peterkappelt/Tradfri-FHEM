@@ -1,9 +1,0 @@
-[submodule "cf-dev/californium"]
-	path = cf-dev/californium
-	url = https://github.com/eclipse/californium.git
-[submodule "cf-dev/californium.tools"]
-	path = cf-dev/californium.tools
-	url = https://github.com/eclipse/californium.tools.git
-[submodule "kCoAPSocket"]
-	path = kCoAPSocket
-	url = https://github.com/peterkappelt/kCoAPSocket
