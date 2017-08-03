@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.5
+# @version 1.16.dev-cf.6
 
 package main;
 use strict;
@@ -10,7 +10,7 @@ use JSON;
 
 my %TradfriGroup_gets = (
 #	'groupInfo'		=> ' ',
-#	'moods'			=> ' ',
+	'moods'			=> ' ',
 );
 
 my %TradfriGroup_sets = (
@@ -19,10 +19,6 @@ my %TradfriGroup_sets = (
 	'dimvalue'	=> '',
 	'mood'		=> '',
 );
-
-#this hash will be filled with known moods, in the form 'moodname' => mood-id
-#@todo this must be stored in $hash
-my %moodsKnown = ();
 
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
@@ -35,7 +31,7 @@ sub TradfriGroup_Initialize($) {
 	$hash->{ReadFn}     = 'TradfriGroup_Read';
 	$hash->{ParseFn}	= 'TradfriGroup_Parse';
 
-	$hash->{Match} = '^subscribedGroupUpdate::';
+	$hash->{Match} = '(^subscribedGroupUpdate::)|(^moodList::)';
 
 	$hash->{AttrList} =
 		"usePercentDimming:1,0 "
@@ -114,20 +110,31 @@ sub TradfriGroup_Parse($$){
 	#check if group with the id exists
 	if(my $hash = $modules{TradfriGroup}{defptr}{$messageGroupID}) 
 	{
-		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
-		my $name = $jsonData->{'name'} || '';
-		my $members = Dumper($jsonData->{'members'});
-		my $dimvalue = $jsonData->{'dimvalue'} || '0';
-		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
+		if('subscribedGroupUpdate' eq $parts[0]){
+			#update of general group info
+			my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
+			my $name = $jsonData->{'name'} || '';
+			my $members = JSON->new->pretty->encode($jsonData->{'members'});
+			my $dimvalue = $jsonData->{'dimvalue'} || '0';
+			$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+			my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
 
-		readingsBeginUpdate($hash);
-		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
-		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
-		readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
-		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
-		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
-		readingsEndUpdate($hash, 1);
+			readingsBeginUpdate($hash);
+			readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
+			readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
+			readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
+			readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+			readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
+			readingsEndUpdate($hash, 1);
+		}elsif('moodList' eq $parts[0]){
+			#update of mood list
+			readingsSingleUpdate($hash, 'moods', JSON->new->pretty->encode($jsonData), 1);
+
+			$hash->{helper}{moods} = undef;
+			foreach (@{$jsonData}){
+				$hash->{helper}{moods}->{$_->{name}} = $_;
+			}
+		}
 		
 		#return the appropriate group's name
 		return $hash->{NAME}; 
@@ -148,71 +155,9 @@ sub TradfriGroup_Get($@) {
 		return "Unknown argument $opt, choose one of " . join(" ", @cList);
 	}
 	
-	# if($opt eq 'groupInfo'){
-	# 	my $jsonText = IOWrite($hash, 'get', PATH_GROUP_ROOT . "/" . $hash->{groupAddress}, '');
-
-	# 	if(!defined($jsonText)){
-	# 		return "Error while fetching group info!";
-	# 	}
-		
-	# 	#parse the JSON data
-	# 	my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
-	# 	if($@){
-	# 		return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
-	# 	}
-
-	# 	return Dumper($jsonData);
-	# }elsif($opt eq 'moods'){
-	# 	my $jsonText = IOWrite($hash, 'get', PATH_MOODS_ROOT . "/" . $hash->{groupAddress}, '');
-
-	# 	if(!defined($jsonText)){
-	# 		return "Error while fetching moods!";
-	# 	}
-		
-	# 	#parse the JSON data
-	# 	my $moodIDList = eval{ JSON->new->utf8->decode($jsonText) };
-	# 	if(($@) || (ref($moodIDList) ne 'ARRAY')){
-	# 		return "Unknown JSON:\n" . $jsonText; #the string was probably not valid JSON
-	# 	}
-
-	# 	my $returnUserString = "";
-	# 	my $returnReadingString = "";
-	# 	%moodsKnown = ();
-
-	# 	for(my $i = 0; $i < scalar(@{$moodIDList}); $i++){
-	# 		my $jsonMoodText = IOWrite($hash, 'get', PATH_MOODS_ROOT . "/" . $hash->{groupAddress} . "/" . ${$moodIDList}[$i], '');
-
-	# 		my $moodName = "UNKNOWN";
-
-	# 		if(defined($jsonMoodText)){
-	# 			#parse the JSON data
-	# 			my $moodInfo = eval{ JSON->new->utf8->decode($jsonMoodText) };
-	# 			if(!($@)){
-	# 				$moodName = dataGetMoodName($moodInfo);
-	# 			}
-	# 		}
-
-	# 		#remove whitespaces in mood names
-	# 		$moodName =~ s/\s//;
-
-	# 		$returnUserString .= "- " .
-	# 			${$moodIDList}[$i] .
-	# 			": " .
-	# 			$moodName . 
-	# 			"\n";
-
-	# 		$returnReadingString .= 	${$moodIDList}[$i] .
-	# 									"//" .
-	# 									$moodName .
-	# 									" ";
-
-	# 		$moodsKnown{"$moodName"} = int(${$moodIDList}[$i]);
-	# 	}
-
-	# 	readingsSingleUpdate($hash, 'moods', $returnReadingString, 1);
-
-	# 	return $returnUserString;
-	# }
+	if($opt eq 'moods'){
+		IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
+	}
 
 	return $TradfriGroup_gets{$opt};
 }
@@ -237,10 +182,9 @@ sub TradfriGroup_Set($@) {
 		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 
 		#dynamic option: moods
-		my $moodsList = join(",", map { "$_" } keys %moodsKnown);
+		my $moodsList = join(",", map { "$_" } keys %{$hash->{helper}{moods}});
 
-		#return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood:$moodsList";
-		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood";
+		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood:$moodsList";
 	}
 	
 	$TradfriGroup_sets{$opt} = $value;
@@ -265,22 +209,16 @@ sub TradfriGroup_Set($@) {
 	}elsif($opt eq "mood"){
 		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
 
-		# if(!($value =~ /[1-9]+/)){
-		# 	#user wrote a string -> a mood name
-		# 	if(exists($moodsKnown{"$value"})){
-		# 		$value = $moodsKnown{"$value"};
-		# 	}else{
-		# 		#try to update the list of known moods -> maybe it is a new mood and the list isn't updated yet
-		# 		TradfriGroup_Get($hash, $hash->{name}, 'moods');
-		# 		if(exists($moodsKnown{"$value"})){
-		# 			$value = $moodsKnown{"$value"};
-		# 		}else{
-		# 			return "Unknown mood!";
-		# 		}
-		# 	}
-		# }
+		if(!($value =~ /[1-9]+/)){
+		 	#user wrote a string -> a mood name
+		 	if(exists($hash->{helper}{moods}->{"$value"})){
+		 		$value = $hash->{helper}{moods}->{"$value"}->{moodid};
+		 	}else{
+	 			return "Unknown mood!";
+		 	}
+		}
 
-		return IOWrite($hash, 1, 'set', $hash->{deviceAddress}, "mood::$value");
+		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "mood::$value");
 	}
 
 	return undef;
@@ -370,12 +308,10 @@ sub TradfriGroup_Attr(@) {
 		<br><br>
         Options:
         <ul>
-              <li><i>groupInfo</i><br>
-                  The RAW JSON-formatted data, that was returned from the group info. Just for development and/ or additional info</li>
                <li><i>moods</i><br>
                   Get all moods (their name and their ID) that are configured for this group<br>
-                  Please note, that the mood IDs may differ between different groups (though they are the same moods) -> check them for each group
-                  Additionally, the reading "moods" is set to a list of available moods.</li>
+                  The JSON-formatted result is stored in the Reading "moods"</br>
+                  Please note, that the mood IDs may differ between different groups (though they are the same moods) -> check them for each group</li>
         </ul>
     </ul>
     <br>
@@ -393,10 +329,10 @@ sub TradfriGroup_Attr(@) {
                   The brightness that is set for this group. It is a integer in the range of 0 to 100/ 254.<br>
                   The greatest dimvalue depends on the attribute "usePercentDimming", see below.</li>
               <li><i>members</i><br>
-                  A space separated list of all device IDs that are member of this group.</li>
+                  JSON-String that contains all member-IDs and their names.</li>
               <li><i>moods</i><br>
-                  A space separated list of all moods and their names that are defined for the group, e.g.<br>
-                  198884//EVERYDAY 213983//RELAX 206399//FOCUS<br>
+                  JSON info of all moods and their names, e.g.:<br>
+                  [ { "groupid" : 173540, "moodid" : 198884, "name" : "EVERYDAY" }, { "moodid" : 213983, "name" : "RELAX", "groupid" : 173540 }, { "groupid" : 173540, "name" : "FOCUS", "moodid" : 206399 } ]<br>
                   This reading isn't updated automatically, you've to call "get moods" in order to refresh them.</li>    
               <li><i>name</i><br>
                   The name of the group that you've set in the app.</li>

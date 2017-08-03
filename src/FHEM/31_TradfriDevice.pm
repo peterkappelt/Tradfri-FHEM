@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.5
+# @version 1.16.dev-cf.6
 
 package main;
 use strict;
@@ -310,8 +310,8 @@ sub TradfriDevice_Attr(@) {
 		<br><br>
         Options:
         <ul>
-              <li><i>deviceInfo</i><br>
-                  The RAW JSON-formatted data, that was returned from the device info. Just for development and/ or additional info</li>
+              <li><i></i><br>
+                  There are no gets implemented</li>
         </ul>
     </ul>
     <br>

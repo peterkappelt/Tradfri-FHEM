@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.5
+# @version 1.16.dev-cf.6
 
 package main;
 use strict;
@@ -31,7 +31,7 @@ sub TradfriGateway_Initialize($) {
 	$hash->{Clients}	= "TradfriDevice:TradfriGroup";
 	$hash->{MatchList} = {
 			"1:TradfriDevice" => '^subscribedDeviceUpdate::',
-			"2:TradfriGroup" => '^subscribedGroupUpdate::' ,
+			"2:TradfriGroup" => '(^subscribedGroupUpdate::)|(^moodList::)' ,
 			};
 }
 
@@ -93,6 +93,7 @@ sub TradfriGateway_DeviceInit($){
 # - 1. Scope: 				Group (1) or Device (0)
 # - 2. Action	: 			A command:
 #								* list -> sets the readings groups/ devices
+#								* moodlist (groups only) -> get all moods that are defined for this group
 #								* subscribe -> subscribe to updated of that specific device
 #								* set -> write a specific value to the group/ device
 # - 3. ID:					ID of the group or device
@@ -116,6 +117,8 @@ sub TradfriGateway_Write ($@){
 
 	if($action eq 'list'){
 		$command .= 'list';
+	}elsif($action eq 'moodlist'){
+		$command .= "moodlist::$id";
 	}elsif($action eq 'subscribe'){
 		#silently return if connection is open.
 		#at startup, every device/ group runs subscribe. If the connection isn't open, we do it later.
@@ -163,7 +166,6 @@ sub TradfriGateway_Read ($){
 		#devices and groups
 		#@todo not as JSON array
 		if(($message ne '') && ((split(/::/, $message))[0] =~ /(?:group|device)List/)){
-			Log(0, $message);
 			if((split(/::/, $message))[0] eq 'deviceList'){
 				readingsSingleUpdate($hash, 'devices', (split(/::/, $message))[1], 1);
 			}
@@ -173,7 +175,7 @@ sub TradfriGateway_Read ($){
 		}
 
 		#dispatch the message if it isn't empty, only dispatch messages that come from an observe
-		if(($message ne '') && ((split(/::/, $message))[0] =~ /subscribed(?:Group|Device)Update/)){
+		if(($message ne '') && ((split(/::/, $message))[0] =~ /(?:subscribed(?:Group|Device)Update)|(?:moodList)/)){
 			Dispatch($hash, $message, undef);
 		}
 	}
@@ -306,15 +308,10 @@ sub TradfriGateway_Attr(@) {
 		<br><br>
         Options:
         <ul>
-              <li><i>coapClientVersion</i><br>
-                  Get the version of the coap-client. If this command returns "UNKNOWN", the coap-client command can't be called.<br>
-                  If coap-client was executed, it'll return the version string and set the reading "coapClientVersion" to the value.</li>
               <li><i>deviceList</i><br>
-                  Returns a list of all devices, that are paired with the gateway.<br>
-                  The list contains the device's address, its type and the name that was set by the user.</li>
+                  Sets the reading "devices" to a JSON-formatted string of all device IDs and their names.</li>
               <li><i>groupList</i><br>
-                  Returns a list of all groups, that are configured in the gateway.<br>
-                  The list contains the group's address and its name.</li>
+                  Sets the reading "devices" to a JSON-formatted string of all group IDs and their names.</li>
         </ul>
     </ul>
     <br>
