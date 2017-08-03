@@ -58,6 +58,9 @@ sub TradfriGroup_Define($$) {
 	#@todo stop observing, when deleting module, or stopping FHEM
 	IOWrite($hash, 1, 'subscribe', $hash->{groupAddress});
 
+	#update the moodlist
+	IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
+
 	return undef;
 }
 
