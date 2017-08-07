@@ -55,7 +55,6 @@ sub TradfriGroup_setBrightness($$){
         
         my $dimvalue = int($dimpercent * 2.54 + 0.5);
 
-        my ($coapPath, $coapData) = cmdSetGroupBrightness($hash->{groupAddress}, $dimvalue);
         readingsSingleUpdate($hash, "dimvalue", $dimvalue, 1);
         readingsSingleUpdate($hash, "pct", $dimpercent, 1);
         $hash->{STATE} = TradfriGroup_stateString($dimpercent);
