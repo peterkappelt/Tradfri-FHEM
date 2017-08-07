@@ -8,6 +8,8 @@ use warnings;
 use Data::Dumper;
 use JSON;
 
+use TradfriUtils;
+
 my %TradfriDevice_gets = (
 #	'deviceInfo'	=> ' ',
 );
@@ -18,47 +20,6 @@ my %TradfriDevice_sets = (
 	'dimvalue'	=> '',
 	'color'		=> '',
 );
-
-my %dim_values = (
-   0 => "dim06%",
-   1 => "dim12%",
-   2 => "dim18%",
-   3 => "dim25%",
-   4 => "dim31%",
-   5 => "dim37%",
-   6 => "dim43%",
-   7 => "dim50%",
-   8 => "dim56%",
-   9 => "dim62%",
-  10 => "dim68%",
-  11 => "dim75%",
-  12 => "dim81%",
-  13 => "dim87%",
-  14 => "dim93%",
-);
-
-#get the on state of the device depending on the dimm value
-sub TradfriDevice_stateString($){
-	my ($value) = @_;
-	if($value <= 0){
-		return 'off';
-	}elsif($value >= 99){
-		return 'on';
-	}else{
-		return "dim$value%";
-	}
-}
-
-sub TradfriDevice_setBrightness($$){
-	my ($hash, $dimpercent) = @_;
-	
-	my $dimvalue = int($dimpercent * 2.54 + 0.5);
-	readingsSingleUpdate($hash, "dimvalue", $dimvalue, 1);
-	readingsSingleUpdate($hash, "pct", $dimpercent, 1);
-
-	$hash->{STATE} = TradfriDevice_stateString($dimpercent);
-	return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");	
-}
 
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
@@ -90,7 +51,7 @@ sub TradfriDevice_Define($$) {
 	$hash->{deviceAddress} = $param[2];
 
 	$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
-	$attr{$hash->{name}}{devStateIcon} = '{(TradfriDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
+	$attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 
 	#reverse search, for Parse
 	$modules{TradfriDevice}{defptr}{$hash->{deviceAddress}} = $hash;
@@ -163,7 +124,7 @@ sub TradfriDevice_Parse ($$){
 		$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 		my $state = 'off';
 		if($jsonData->{'onoff'} || '0'){
-			$state = TradfriDevice_stateString($dimpercent);
+			$state = Tradfri_stateString($dimpercent);
 		}
 		my $name = $jsonData->{'name'} || '';
 		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
@@ -187,22 +148,13 @@ sub TradfriDevice_Parse ($$){
 		readingsEndUpdate($hash, 1);
 	
 		$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
-		$attr{$hash->{name}}{devStateIcon} = '{(TradfriDevice_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
+		$attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 		
 		#return the appropriate device's name
 		return $hash->{name}; 
 	}
 	
 	return undef;
-}
-
-sub TradfriDevice_devStateIcon($){
-	my ($name) = @_;
-	my $pct = ReadingsVal($name,"pct","100");
-	my $s = $dim_values{int($pct/7)};
-	$s="on" if( $pct eq "100" );
-	$s="off" if( $pct eq "0" );
-	return ".*:$s:toggle";
 }
 
 sub TradfriDevice_Get($@) {
@@ -258,24 +210,20 @@ sub TradfriDevice_Set($@) {
 		my $dimpercent = ReadingsVal($hash->{name}, 'dimvalue', 254);
 		$dimpercent = int($dimpercent / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		TradfriDevice_setBrightness($hash,$dimpercent);
+		Tradfri_setBrightness($hash,$dimpercent, $hash->{deviceAddress});
 	}elsif($opt eq "off"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = TradfriDevice_stateString(0);
-                readingsSingleUpdate($hash, "pct", 0, 1);
-
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
+		Tradfri_setBrightness($hash,0, $hash->{deviceAddress});
 	}elsif($opt eq "dimvalue"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
 		
 		my $dimpercent = int($value);
 		$dimpercent = int($value / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
 
-		TradfriDevice_setBrightness($hash,$dimpercent);
+		Tradfri_setBrightness($hash,$dimpercent, $hash->{deviceAddress});
 	}elsif($opt eq "pct"){
 		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 100!'  if ! @param;
 	
-		TradfriDevice_setBrightness($hash,int($value));
+		Tradfri_setBrightness($hash,int($value),$hash->{deviceAddress});
 	}elsif($opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
 		
