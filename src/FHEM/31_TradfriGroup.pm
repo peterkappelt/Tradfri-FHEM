@@ -20,6 +20,24 @@ my %TradfriGroup_sets = (
 	'mood'		=> '',
 );
 
+my %dim_values = (
+   0 => "dim06%",
+   1 => "dim12%",
+   2 => "dim18%",
+   3 => "dim25%",
+   4 => "dim31%",
+   5 => "dim37%",
+   6 => "dim43%",
+   7 => "dim50%",
+   8 => "dim56%",
+   9 => "dim62%",
+  10 => "dim68%",
+  11 => "dim75%",
+  12 => "dim81%",
+  13 => "dim87%",
+  14 => "dim93%",
+);
+
 #get the on state of the group depending on the dimm value
 sub TradfriGroup_stateString($){
         my ($value) = @_;
@@ -239,7 +257,7 @@ sub TradfriGroup_Set($@) {
                 #@todo state shouldn't be updated here?!
                 $hash->{STATE} = TradfriGroup_stateString(0);
                 readingsSingleUpdate($hash, "pct", 0, 1);
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
+		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, 'onoff::0');
         }elsif($opt eq "dimvalue"){
                 return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
 
