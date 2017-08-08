@@ -2,6 +2,10 @@
 
 This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
 
+## Important
+
+There will be a bigger update soon. Your action might be required. Read here: <http://electronic.kappelt.net/wordpress/tradfri-upcoming-update/>
+
 ## Install to FHEM
 Run the following commands to add this repository to your FHEM setup:
 ```
