@@ -1,3 +1,6 @@
+- 8.8.2017 (1.17)
+  - bugfix:     31_TradfriGroup: fixed zero-division
+
 - 5.7.2017 (1.16)
   - bugfix:     31_TradfriGroup: no more warnings ("smartmatch") @ FHEM startup
   - bugfix:     31_TradfriDevice: no more warnings @ FHEM startup

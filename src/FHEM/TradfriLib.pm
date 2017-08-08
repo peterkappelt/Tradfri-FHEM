@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16
+# @version 1.17
 
 package TradfriLib;
 use strict;
@@ -198,7 +198,8 @@ sub getGroupBrightness{
 			$deviceBrightnessMean += $currentDeviceInfo->{3311}[0]->{5851};
 		}
 	}
-
+	
+	return 0 if ($validDeviceCount == 0);
 	return int($deviceBrightnessMean / $validDeviceCount + 0.5);
 
 	#return $_[0]->{5851};
