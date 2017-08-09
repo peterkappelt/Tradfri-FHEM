@@ -45,9 +45,9 @@ sub Tradfri_setBrightness($$){
 	my ($hash, $dimpercent) = @_;
 	readingsSingleUpdate($hash, "pct", $dimpercent, 1);
 	$hash->{STATE} = Tradfri_stateString($dimpercent);
+	my $address = $hash->{address};
 
 	my $type = 0;
-	my $address = $hash->{address};
 	if( $hash->{TYPE} eq 'TradfriGroup'){
 		$type = 1;
 	}
@@ -74,7 +74,7 @@ sub Tradfri_Set($@) {
 
 	$cmdList .= " color:warm,cold,standard" if($hash->{TYPE} eq 'TradfriDevice');
 	if($hash->{TYPE} eq 'TradfriGroup'){
-#dynamic option: moods
+		#dynamic option: moods
 		my $moodsList = join(",", map { "$_" } keys %{$hash->{helper}{moods}});
 		$cmdList .= " mood:$moodsList" 
 	}
