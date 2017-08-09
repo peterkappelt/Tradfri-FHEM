@@ -22,7 +22,7 @@ sub TradfriDevice_Initialize($) {
 	$hash->{SetFn}      = 'Tradfri_Set';
 	$hash->{GetFn}      = 'TradfriDevice_Get';
 	$hash->{AttrFn}     = 'Tradfri_Attr';
-	$hash->{ReadFn}     = 'TradfriDevice_Read';
+	$hash->{ReadFn}     = 'Tradfri_Read';
 	$hash->{ParseFn}	= 'TradfriDevice_Parse';
 
 	$hash->{Match} = '^subscribedDeviceUpdate::';

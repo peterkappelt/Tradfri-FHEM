@@ -23,7 +23,7 @@ sub TradfriGroup_Initialize($) {
 	$hash->{SetFn}      = 'Tradfri_Set';
 	$hash->{GetFn}      = 'TradfriGroup_Get';
 	$hash->{AttrFn}     = 'Tradfri_Attr';
-	$hash->{ReadFn}     = 'TradfriGroup_Read';
+	$hash->{ReadFn}     = 'Tradfri_Read';
 	$hash->{ParseFn}	= 'TradfriGroup_Parse';
 
 	$hash->{Match} = '(^subscribedGroupUpdate::)|(^moodList::)';
