@@ -159,14 +159,13 @@ sub Tradfri_Define($$) {
 
 	AssignIoPort($hash);
 
+	#reverse search, for Parse
+	$modules{$hash->{TYPE}}{defptr}{$hash->{address}} = $hash;
 	if($hash->{TYPE} eq 'TradfriDevice'){
-		#reverse search, for Parse
-		$modules{TradfriDevice}{defptr}{$hash->{address}} = $hash;
 		#start observing the coap resource, so the module will be informed about status updates
 		#@todo stop observing, when deleting module, or stopping FHEM
 		IOWrite($hash, 0, 'subscribe', $hash->{address});
 	}elsif($hash->{TYPE} eq 'TradfriGroup'){
-		$modules{TradfriGroup}{defptr}{$hash->{address}} = $hash;
 		IOWrite($hash, 1, 'subscribe', $hash->{address});
 
 		#update the moodlist

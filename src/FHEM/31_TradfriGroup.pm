@@ -61,16 +61,10 @@ sub TradfriGroup_Parse($$){
 		return undef;
 	}
 
-	#parse the JSON data
-	my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
-	if($@){
-		return undef; #the string was probably not valid JSON
-	}
-
-	my $messageGroupID = $parts[1];
+	my $messageID = $parts[1];
 
 	#check if group with the id exists
-	if(my $hash = $modules{TradfriGroup}{defptr}{$messageGroupID}) 
+	if(my $hash = $modules{$hash->{TYPE}}{defptr}{$messageID}) 
 	{
 		if('subscribedGroupUpdate' eq $parts[0]){
 			#update of general group info
