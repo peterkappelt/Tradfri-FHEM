@@ -47,10 +47,9 @@ sub Tradfri_setBrightness($$){
 	$hash->{STATE} = Tradfri_stateString($dimpercent);
 
 	my $type = 0;
-	my $address = $hash->{deviceAddress};
+	my $address = $hash->{address};
 	if( $hash->{TYPE} eq 'TradfriGroup'){
 		$type = 1;
-		$address = $hash->{groupAddress};
 	}
 
 	if( $dimpercent == 0 ){
@@ -104,7 +103,7 @@ sub Tradfri_Set($@) {
 		Tradfri_setBrightness($hash,int($value));
 	}elsif($hash->{TYPE} eq 'TradfriGroup' and $opt eq "mood"){
 		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ! @param;
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "mood::$value");
+		return IOWrite($hash, 1, 'set', $hash->{address}, "mood::$value");
 	}elsif($hash->{TYPE} eq 'tradfriDevice' and $opt eq "color"){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
 
@@ -120,7 +119,7 @@ sub Tradfri_Set($@) {
 			$rgb = $value;
 		}
 
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "color::$rgb");
+		return IOWrite($hash, 0, 'set', $hash->{address}, "color::$rgb");
 	}else{
 		return SetExtensions($hash, $cmdList, $name, $opt, @param);
 	}
@@ -131,6 +130,49 @@ sub Tradfri_Set($@) {
 sub Tradfri_Undef($$) {
 	my ($hash, $arg) = @_; 
 # nothing to do
+	return undef;
+}
+
+sub Tradfri_Attr(@) {
+	my ($cmd,$name,$attr_name,$attr_value) = @_;
+	if($cmd eq "set") {
+		if($attr_name eq ""){
+
+		}
+	}
+	return undef;
+}
+
+sub Tradfri_Define($$) {
+	my ($hash, $def) = @_;
+	my @param = split('[ \t]+', $def);
+	
+	if(int(@param) < 3) {
+		return "too few parameters: define <name> $hash->{TYPE} <Address>";
+	}
+   
+	$hash->{name}  = $param[0];
+	$hash->{address} = $param[2];
+
+	$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
+	$attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
+
+	AssignIoPort($hash);
+	
+	if($hash->{TYPE} eq 'TradfriDevice'){
+		#reverse search, for Parse
+		$modules{TradfriDevice}{defptr}{$hash->{address}} = $hash;
+		#start observing the coap resource, so the module will be informed about status updates
+		#@todo stop observing, when deleting module, or stopping FHEM
+		IOWrite($hash, 0, 'subscribe', $hash->{address});
+	}elsif($hash->{TYPE} eq 'TradfriGroup'){
+		$modules{TradfriGroup}{defptr}{$hash->{address}} = $hash;
+		IOWrite($hash, 1, 'subscribe', $hash->{address});
+		
+		#update the moodlist
+		IOWrite($hash, 1, 'moodlist', $hash->{address});
+	}
+
 	return undef;
 }
 

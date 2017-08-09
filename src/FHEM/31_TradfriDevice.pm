@@ -17,11 +17,11 @@ my %TradfriDevice_gets = (
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
-	$hash->{DefFn}      = 'TradfriDevice_Define';
+	$hash->{DefFn}      = 'Tradfri_Define';
 	$hash->{UndefFn}    = 'Tradfri_Undef';
 	$hash->{SetFn}      = 'Tradfri_Set';
 	$hash->{GetFn}      = 'TradfriDevice_Get';
-	$hash->{AttrFn}     = 'TradfriDevice_Attr';
+	$hash->{AttrFn}     = 'Tradfri_Attr';
 	$hash->{ReadFn}     = 'TradfriDevice_Read';
 	$hash->{ParseFn}	= 'TradfriDevice_Parse';
 
@@ -30,32 +30,6 @@ sub TradfriDevice_Initialize($) {
 	$hash->{AttrList} =
 		"usePercentDimming:1,0 "
 		. $readingFnAttributes;
-}
-
-sub TradfriDevice_Define($$) {
-	my ($hash, $def) = @_;
-	my @param = split('[ \t]+', $def);
-	
-	if(int(@param) < 3) {
-		return "too few parameters: define <name> TradfriDevice <DeviceAddress>";
-	}
-   
-	$hash->{name}  = $param[0];
-	$hash->{deviceAddress} = $param[2];
-
-	$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
-	$attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
-
-	#reverse search, for Parse
-	$modules{TradfriDevice}{defptr}{$hash->{deviceAddress}} = $hash;
-
-	AssignIoPort($hash);
-
-	#start observing the coap resource, so the module will be informed about status updates
-	#@todo stop observing, when deleting module, or stopping FHEM
-	IOWrite($hash, 0, 'subscribe', $hash->{deviceAddress});
-
-	return undef;
 }
 
 #messages look like this: (without newlines)
@@ -157,7 +131,7 @@ sub TradfriDevice_Get($@) {
 	}
 	
 	if($opt eq 'deviceInfo'){
-		# my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress}, '');
+		# my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{address}, '');
 
 		# if(!defined($jsonText)){
 		# 	return "Error while fetching device info!";
@@ -175,14 +149,6 @@ sub TradfriDevice_Get($@) {
 	return $TradfriDevice_gets{$opt};
 }
 
-sub TradfriDevice_Attr(@) {
-	my ($cmd,$name,$attr_name,$attr_value) = @_;
-	if($cmd eq "set") {
-		if($attr_name eq ""){
-		}
-	}
-	return undef;
-}
 
 1;
 

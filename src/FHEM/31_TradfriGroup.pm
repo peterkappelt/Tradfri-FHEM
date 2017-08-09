@@ -18,11 +18,11 @@ my %TradfriGroup_gets = (
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
 
-	$hash->{DefFn}      = 'TradfriGroup_Define';
+	$hash->{DefFn}      = 'Tradfri_Define';
 	$hash->{UndefFn}    = 'Tradfri_Undef';
 	$hash->{SetFn}      = 'Tradfri_Set';
 	$hash->{GetFn}      = 'TradfriGroup_Get';
-	$hash->{AttrFn}     = 'TradfriGroup_Attr';
+	$hash->{AttrFn}     = 'Tradfri_Attr';
 	$hash->{ReadFn}     = 'TradfriGroup_Read';
 	$hash->{ParseFn}	= 'TradfriGroup_Parse';
 
@@ -33,34 +33,6 @@ sub TradfriGroup_Initialize($) {
 		. $readingFnAttributes;
 }
 
-sub TradfriGroup_Define($$) {
-	my ($hash, $def) = @_;
-	my @param = split('[ \t]+', $def);
-	
-	if(int(@param) < 3) {
-		return "too few parameters: define <name> TradfriGroup <GroupAddress>";
-	}
-   
-	$hash->{name}  = $param[0];
-	$hash->{groupAddress} = $param[2];
-
-	$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
-        $attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
-
-	#reverse search, for Parse
-	$modules{TradfriGroup}{defptr}{$hash->{groupAddress}} = $hash;
-
-	AssignIoPort($hash);
-
-	#start observing the coap resource, so the module will be informed about status updates
-	#@todo stop observing, when deleting module, or stopping FHEM
-	IOWrite($hash, 1, 'subscribe', $hash->{groupAddress});
-
-	#update the moodlist
-	IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
-
-	return undef;
-}
 
 #messages look like this: (without newlines)
 # subscribedGroupUpdate::group-id::{
@@ -161,20 +133,10 @@ sub TradfriGroup_Get($@) {
 	}
 	
 	if($opt eq 'moods'){
-		IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
+		IOWrite($hash, 1, 'moodlist', $hash->{address});
 	}
 
 	return $TradfriGroup_gets{$opt};
-}
-
-sub TradfriGroup_Attr(@) {
-	my ($cmd,$name,$attr_name,$attr_value) = @_;
-	if($cmd eq "set") {
-		if($attr_name eq ""){
-
-		}
-	}
-	return undef;
 }
 
 1;
