@@ -14,19 +14,12 @@ my %TradfriDevice_gets = (
 #	'deviceInfo'	=> ' ',
 );
 
-my %TradfriDevice_sets = (
-	'on'		=> '',
-	'off'		=> '',	
-	'dimvalue'	=> '',
-	'color'		=> '',
-);
-
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
 	$hash->{DefFn}      = 'TradfriDevice_Define';
-	$hash->{UndefFn}    = 'TradfriDevice_Undef';
-	$hash->{SetFn}      = 'TradfriDevice_Set';
+	$hash->{UndefFn}    = 'Tradfri_Undef';
+	$hash->{SetFn}      = 'Tradfri_Set';
 	$hash->{GetFn}      = 'TradfriDevice_Get';
 	$hash->{AttrFn}     = 'TradfriDevice_Attr';
 	$hash->{ReadFn}     = 'TradfriDevice_Read';
@@ -62,12 +55,6 @@ sub TradfriDevice_Define($$) {
 	#@todo stop observing, when deleting module, or stopping FHEM
 	IOWrite($hash, 0, 'subscribe', $hash->{deviceAddress});
 
-	return undef;
-}
-
-sub TradfriDevice_Undef($$) {
-	my ($hash, $arg) = @_; 
-	# nothing to do
 	return undef;
 }
 
@@ -186,63 +173,6 @@ sub TradfriDevice_Get($@) {
 	}
 
 	return $TradfriDevice_gets{$opt};
-}
-
-sub TradfriDevice_Set($@) {
-	my ($hash, $name, $opt, @param) = @_;
-	
-	return '"set TradfriDevice" needs at least one argument' unless(defined($opt));
-
-	my $value = join("", @param);
-        
-        my $dimvalueMax = 254;
-	$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-	my $cmdList = "on off pct:colorpicker,BRI,0,1,100 dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
-	
-	$TradfriDevice_sets{$opt} = $value;
-
-	if ($opt eq "toggle") {
-		$opt = (ReadingsVal($hash->{name}, 'pct', 0) == 0) ? "on" : "off";
-	}
-
-	if($opt eq "on"){
-		#@todo state shouldn't be updated here?!
-		my $dimpercent = ReadingsVal($hash->{name}, 'dimvalue', 254);
-		$dimpercent = int($dimpercent / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
-
-		Tradfri_setBrightness($hash,$dimpercent, $hash->{deviceAddress});
-	}elsif($opt eq "off"){
-		Tradfri_setBrightness($hash,0, $hash->{deviceAddress});
-	}elsif($opt eq "dimvalue"){
-		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
-		
-		my $dimpercent = int($value);
-		$dimpercent = int($value / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
-
-		Tradfri_setBrightness($hash,$dimpercent, $hash->{deviceAddress});
-	}elsif($opt eq "pct"){
-		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 100!'  if ! @param;
-	
-		Tradfri_setBrightness($hash,int($value),$hash->{deviceAddress});
-	}elsif($opt eq "color"){
-		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
-		
-		my $rgb;
-
-		if($value eq "warm"){
-			$rgb = 'EFD275';
-		}elsif($value eq "cold"){
-			$rgb = 'F5FAF6';
-		}elsif($value eq "standard"){
-			$rgb = 'F1E0B5';
-		}else{
-			$rgb = $value;
-		}
-	
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "color::$rgb");
-	}else{
-		return SetExtensions($hash, $cmdList, $name, $opt, @param);
-	}
 }
 
 sub TradfriDevice_Attr(@) {

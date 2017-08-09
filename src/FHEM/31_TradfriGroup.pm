@@ -15,19 +15,12 @@ my %TradfriGroup_gets = (
 	'moods'			=> ' ',
 );
 
-my %TradfriGroup_sets = (
-	'on'		=> '',
-	'off'		=> '',	
-	'dimvalue'	=> '',
-	'mood'		=> '',
-);
-
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
 
 	$hash->{DefFn}      = 'TradfriGroup_Define';
-	$hash->{UndefFn}    = 'TradfriGroup_Undef';
-	$hash->{SetFn}      = 'TradfriGroup_Set';
+	$hash->{UndefFn}    = 'Tradfri_Undef';
+	$hash->{SetFn}      = 'Tradfri_Set';
 	$hash->{GetFn}      = 'TradfriGroup_Get';
 	$hash->{AttrFn}     = 'TradfriGroup_Attr';
 	$hash->{ReadFn}     = 'TradfriGroup_Read';
@@ -66,12 +59,6 @@ sub TradfriGroup_Define($$) {
 	#update the moodlist
 	IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
 
-	return undef;
-}
-
-sub TradfriGroup_Undef($$) {
-	my ($hash, $arg) = @_; 
-	# nothing to do
 	return undef;
 }
 
@@ -179,55 +166,6 @@ sub TradfriGroup_Get($@) {
 
 	return $TradfriGroup_gets{$opt};
 }
-
-sub TradfriGroup_Set($@) {
-	my ($hash, $name, $opt, @param) = @_;
-	
-	return '"set TradfriGroup" needs at least one argument' unless(defined($opt));
-
-	my $value = join("", @param);
-
-	#dynamic option: moods
-	my $moodsList = join(",", map { "$_" } keys %{$hash->{helper}{moods}});
-
-	my $dimvalueMax = 254;
-        $dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-        my $cmdList = "on off pct:colorpicker,BRI,0,1,100 dimvalue:slider,0,1,$dimvalueMax mood:$moodsList";
-	
-	$TradfriGroup_sets{$opt} = $value;
-
-	if ($opt eq "toggle") {
-                $opt = (ReadingsVal($hash->{name}, 'pct', 0) == 0) ? "on" : "off";
-        }
-
-	if($opt eq "on"){
-                my $dimpercent = ReadingsVal($hash->{name}, 'dimvalue', 254);
-                $dimpercent = int($dimpercent / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
-
-                Tradfri_setBrightness($hash,$dimpercent,$hash->{groupAddress});
-        }elsif($opt eq "off"){
-                Tradfri_setBrightness($hash,0,$hash->{groupAddress});
-        }elsif($opt eq "dimvalue"){
-                return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ! @param;
-
-                my $dimpercent = int($value);
-                $dimpercent = int($value / 2.54 + 0.5) if(AttrVal($hash->{name}, 'usePercentDimming', 0) == 0);
-
-                Tradfri_setBrightness($hash,$dimpercent,$hash->{groupAddress});
-        }elsif($opt eq "pct"){
-                return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 100!'  if ! @param;
-
-                Tradfri_setBrightness($hash,int($value),$hash->{groupAddress});
-        }elsif($opt eq "mood"){
-		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ! @param;
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "mood::$value");
-	}else{
-                return SetExtensions($hash, $cmdList, $name, $opt, @param);
-        }
-
-	return undef;
-}
-
 
 sub TradfriGroup_Attr(@) {
 	my ($cmd,$name,$attr_name,$attr_value) = @_;
