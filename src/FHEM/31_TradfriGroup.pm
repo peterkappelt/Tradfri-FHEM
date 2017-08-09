@@ -10,18 +10,13 @@ use JSON;
 
 use TradfriUtils;
 
-my %TradfriGroup_gets = (
-#	'groupInfo'		=> ' ',
-	'moods'			=> ' ',
-);
-
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
 
 	$hash->{DefFn}      = 'Tradfri_Define';
 	$hash->{UndefFn}    = 'Tradfri_Undef';
 	$hash->{SetFn}      = 'Tradfri_Set';
-	$hash->{GetFn}      = 'TradfriGroup_Get';
+	$hash->{GetFn}      = 'Tradfri_Get';
 	$hash->{AttrFn}     = 'Tradfri_Attr';
 	$hash->{ReadFn}     = 'Tradfri_Read';
 	$hash->{ParseFn}	= 'TradfriGroup_Parse';
@@ -118,25 +113,6 @@ sub TradfriGroup_Parse($$){
 	}
 
 	return undef;
-}
-
-sub TradfriGroup_Get($@) {
-	my ($hash, @param) = @_;
-	
-	return '"get TradfriGroup" needs at least one argument' if (int(@param) < 2);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
-	if(!$TradfriGroup_gets{$opt}) {
-		my @cList = keys %TradfriGroup_gets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
-	}
-	
-	if($opt eq 'moods'){
-		IOWrite($hash, 1, 'moodlist', $hash->{address});
-	}
-
-	return $TradfriGroup_gets{$opt};
 }
 
 1;

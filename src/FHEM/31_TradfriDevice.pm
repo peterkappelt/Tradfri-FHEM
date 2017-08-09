@@ -10,17 +10,13 @@ use JSON;
 
 use TradfriUtils;
 
-my %TradfriDevice_gets = (
-#	'deviceInfo'	=> ' ',
-);
-
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
 	$hash->{DefFn}      = 'Tradfri_Define';
 	$hash->{UndefFn}    = 'Tradfri_Undef';
 	$hash->{SetFn}      = 'Tradfri_Set';
-	$hash->{GetFn}      = 'TradfriDevice_Get';
+	$hash->{GetFn}      = 'Tradfri_Get';
 	$hash->{AttrFn}     = 'Tradfri_Attr';
 	$hash->{ReadFn}     = 'Tradfri_Read';
 	$hash->{ParseFn}	= 'TradfriDevice_Parse';
@@ -116,37 +112,6 @@ sub TradfriDevice_Parse ($$){
 	}
 	
 	return undef;
-}
-
-sub TradfriDevice_Get($@) {
-	my ($hash, @param) = @_;
-	
-	return '"get TradfriDevice" needs at least one argument' if (int(@param) < 2);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
-	if(!$TradfriDevice_gets{$opt}) {
-		my @cList = keys %TradfriDevice_gets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
-	}
-	
-	if($opt eq 'deviceInfo'){
-		# my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{address}, '');
-
-		# if(!defined($jsonText)){
-		# 	return "Error while fetching device info!";
-		# }
-		
-		# #parse the JSON data
-		# my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
-		# if($@){
-		# 	return $jsonText; #the string was probably not valid JSON
-		# }
-
-		# return Dumper($jsonData);
-	}
-
-	return $TradfriDevice_gets{$opt};
 }
 
 

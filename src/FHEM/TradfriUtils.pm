@@ -129,7 +129,7 @@ sub Tradfri_Set($@) {
 
 sub Tradfri_Undef($$) {
 	my ($hash, $arg) = @_; 
-# nothing to do
+	# nothing to do
 	return undef;
 }
 
@@ -146,11 +146,11 @@ sub Tradfri_Attr(@) {
 sub Tradfri_Define($$) {
 	my ($hash, $def) = @_;
 	my @param = split('[ \t]+', $def);
-	
+
 	if(int(@param) < 3) {
 		return "too few parameters: define <name> $hash->{TYPE} <Address>";
 	}
-   
+
 	$hash->{name}  = $param[0];
 	$hash->{address} = $param[2];
 
@@ -158,7 +158,7 @@ sub Tradfri_Define($$) {
 	$attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 
 	AssignIoPort($hash);
-	
+
 	if($hash->{TYPE} eq 'TradfriDevice'){
 		#reverse search, for Parse
 		$modules{TradfriDevice}{defptr}{$hash->{address}} = $hash;
@@ -168,7 +168,7 @@ sub Tradfri_Define($$) {
 	}elsif($hash->{TYPE} eq 'TradfriGroup'){
 		$modules{TradfriGroup}{defptr}{$hash->{address}} = $hash;
 		IOWrite($hash, 1, 'subscribe', $hash->{address});
-		
+
 		#update the moodlist
 		IOWrite($hash, 1, 'moodlist', $hash->{address});
 	}
@@ -176,4 +176,38 @@ sub Tradfri_Define($$) {
 	return undef;
 }
 
+sub Tradfri_Get($@) {
+	my ($hash, @param) = @_;
 
+	return "\"get $hash->{TYPE}\" needs at least one argument" if (int(@param) < 2);
+
+	my $name = shift @param;
+	my $opt = shift @param;
+
+	my $cmdList = "";
+	$cmdList .= " moods" if($hash->{TYPE} eq 'TradfriGroup');	
+	#$cmdList .= " groupInfo" if($hash->{TYPE} eq 'TradfriGroup');	
+	#$cmdList .= " deviceInfo" if($hash->{TYPE} eq 'TradfriDevice');	
+
+	if($hash->{TYPE} eq 'TradfriGroup' and $opt eq 'moods'){
+		IOWrite($hash, 1, 'moodlist', $hash->{address});
+		return '';
+#	}elsif($hash->{TYPE} eq 'TradfriGroup' and $opt eq 'groupInfo'){
+#	}elsif($hash->{TYPE} eq 'TradfriDevice' and $opt eq 'deviceInfo'){
+#		my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{address}, '');
+#
+#               if(!defined($jsonText)){
+#                     return "Error while fetching device info!";
+#               }
+#               
+#               #parse the JSON data
+#               my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
+#               if($@){
+#                     return $jsonText; #the string was probably not valid JSON
+#               }
+#
+#               return Dumper($jsonData);
+	}else{
+		return "Unknown argument $opt, choose one of $cmdList";
+	}
+}
