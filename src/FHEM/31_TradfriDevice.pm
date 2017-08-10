@@ -54,7 +54,7 @@ sub TradfriDevice_Parse ($$){
 	my $messageID = $parts[1];
 
 	#check if device with the id exists
-	if(my $hash = $modules{$hash->{TYPE}}{defptr}{$messageID}) 
+	if(my $hash = $modules{'TradfriDevice'}{defptr}{$messageID}) 
 	{
 		# the path returned "Not Found" -> unknown resource, but this message still suits for this device
 		if($parts[2] eq "Not Found"){
@@ -72,11 +72,14 @@ sub TradfriDevice_Parse ($$){
 		my $type = $jsonData->{'type'} || '';
 		my $dimvalue = $jsonData->{'dimvalue'} || '0';
 		my $dimpercent = int($dimvalue / 2.54 + 0.5);
+		$dimpercent = 1 if($dimvalue == 1);
 		$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 		my $state = 'off';
-		if($jsonData->{'onoff'} || '0'){
-			$state = Tradfri_stateString($dimpercent);
-		}
+		if($jsonData->{'onoff'} eq '0'){
+			$dimpercent = 0;
+		}else{
+                       	$state = Tradfri_stateString($dimpercent);
+                }
 		my $name = $jsonData->{'name'} || '';
 		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
 		my $reachableState = $jsonData->{'reachabilityState'} || '';

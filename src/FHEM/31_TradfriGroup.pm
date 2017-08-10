@@ -64,18 +64,24 @@ sub TradfriGroup_Parse($$){
 	my $messageID = $parts[1];
 
 	#check if group with the id exists
-	if(my $hash = $modules{$hash->{TYPE}}{defptr}{$messageID}) 
+	if(my $hash = $modules{'TradfriGroup'}{defptr}{$messageID}) 
 	{
+		#parse the JSON data
+		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+		if($@){
+			return undef; #the string was probably not valid JSON
+		}
+
 		if('subscribedGroupUpdate' eq $parts[0]){
-			#update of general group info
 			my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
 			my $name = $jsonData->{'name'} || '';
 			my $members = JSON->new->pretty->encode($jsonData->{'members'});
 			my $dimvalue = $jsonData->{'dimvalue'} || '0';
 			my $dimpercent = int($dimvalue / 2.54 + 0.5);
+			$dimpercent = 1 if($dimvalue == 1);
 			$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
 			my $state = 'off';
-                	if($jsonData->{'onoff'} == '0'){
+                	if($jsonData->{'onoff'} eq '0'){
 				$dimpercent = 0;
 			}else{
                         	$state = Tradfri_stateString($dimpercent);
