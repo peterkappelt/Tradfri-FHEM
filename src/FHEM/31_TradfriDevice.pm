@@ -8,26 +8,17 @@ use warnings;
 use Data::Dumper;
 use JSON;
 
-my %TradfriDevice_gets = (
-#	'deviceInfo'	=> ' ',
-);
-
-my %TradfriDevice_sets = (
-	'on'		=> '',
-	'off'		=> '',	
-	'dimvalue'	=> '',
-	'color'		=> '',
-);
+use TradfriUtils;
 
 sub TradfriDevice_Initialize($) {
 	my ($hash) = @_;
 
-	$hash->{DefFn}      = 'TradfriDevice_Define';
-	$hash->{UndefFn}    = 'TradfriDevice_Undef';
-	$hash->{SetFn}      = 'TradfriDevice_Set';
-	$hash->{GetFn}      = 'TradfriDevice_Get';
-	$hash->{AttrFn}     = 'TradfriDevice_Attr';
-	$hash->{ReadFn}     = 'TradfriDevice_Read';
+	$hash->{DefFn}      = 'Tradfri_Define';
+	$hash->{UndefFn}    = 'Tradfri_Undef';
+	$hash->{SetFn}      = 'Tradfri_Set';
+	$hash->{GetFn}      = 'Tradfri_Get';
+	$hash->{AttrFn}     = 'Tradfri_Attr';
+	$hash->{ReadFn}     = 'Tradfri_Read';
 	$hash->{ParseFn}	= 'TradfriDevice_Parse';
 
 	$hash->{Match} = '^subscribedDeviceUpdate::';
@@ -35,35 +26,6 @@ sub TradfriDevice_Initialize($) {
 	$hash->{AttrList} =
 		"usePercentDimming:1,0 "
 		. $readingFnAttributes;
-}
-
-sub TradfriDevice_Define($$) {
-	my ($hash, $def) = @_;
-	my @param = split('[ \t]+', $def);
-	
-	if(int(@param) < 3) {
-		return "too few parameters: define <name> TradfriDevice <DeviceAddress>";
-	}
-   
-	$hash->{name}  = $param[0];
-	$hash->{deviceAddress} = $param[2];
-
-	#reverse search, for Parse
-	$modules{TradfriDevice}{defptr}{$hash->{deviceAddress}} = $hash;
-
-	AssignIoPort($hash);
-
-	#start observing the coap resource, so the module will be informed about status updates
-	#@todo stop observing, when deleting module, or stopping FHEM
-	IOWrite($hash, 0, 'subscribe', $hash->{deviceAddress});
-
-	return undef;
-}
-
-sub TradfriDevice_Undef($$) {
-	my ($hash, $arg) = @_; 
-	# nothing to do
-	return undef;
 }
 
 #messages look like this: (without newlines)
@@ -89,22 +51,35 @@ sub TradfriDevice_Parse ($$){
 		return undef;
 	}
 	
-	#parse the JSON data
-	my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
-	if($@){
-		return undef; #the string was probably not valid JSON
-	}
-
-	my $messageDeviceID = $parts[1];
+	my $messageID = $parts[1];
 
 	#check if device with the id exists
-	if(my $hash = $modules{TradfriDevice}{defptr}{$messageDeviceID}) 
+	if(my $hash = $modules{'TradfriDevice'}{defptr}{$messageID}) 
 	{
+		# the path returned "Not Found" -> unknown resource, but this message still suits for this device
+		if($parts[2] eq "Not Found"){
+			$hash->{STATE} = "NotFound";
+			return $hash->{NAME};
+		}
+
+		#parse the JSON data
+		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+		if($@){
+			return undef; #the string was probably not valid JSON
+		}
+
 		my $manufacturer = $jsonData->{'manufacturer'} || '';
 		my $type = $jsonData->{'type'} || '';
 		my $dimvalue = $jsonData->{'dimvalue'} || '0';
-		$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-		my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
+		my $dimpercent = int($dimvalue / 2.54 + 0.5);
+		$dimpercent = 1 if($dimvalue == 1);
+		$dimvalue = $dimpercent if (AttrVal($hash->{NAME}, 'usePercentDimming', 0) == 1);
+		my $state = 'off';
+		if($jsonData->{'onoff'} eq '0'){
+			$dimpercent = 0;
+		}else{
+                       	$state = Tradfri_stateString($dimpercent);
+                }
 		my $name = $jsonData->{'name'} || '';
 		my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
 		my $reachableState = $jsonData->{'reachabilityState'} || '';
@@ -114,6 +89,7 @@ sub TradfriDevice_Parse ($$){
 
 		readingsBeginUpdate($hash);
 		readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+		readingsBulkUpdateIfChanged($hash, 'pct', $dimpercent, 1);
 		readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
 		readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
 		readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
@@ -124,6 +100,9 @@ sub TradfriDevice_Parse ($$){
 		readingsBulkUpdateIfChanged($hash, 'color', $color, 1);
 		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
 		readingsEndUpdate($hash, 1);
+	
+		$attr{$hash->{NAME}}{webCmd} = 'pct:toggle:on:off';
+		$attr{$hash->{NAME}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{NAME}}{devStateIcon} ) );
 		
 		#return the appropriate device's name
 		return $hash->{NAME}; 
@@ -132,106 +111,6 @@ sub TradfriDevice_Parse ($$){
 	return undef;
 }
 
-sub TradfriDevice_Get($@) {
-	my ($hash, @param) = @_;
-	
-	return '"get TradfriDevice" needs at least one argument' if (int(@param) < 2);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
-	if(!$TradfriDevice_gets{$opt}) {
-		my @cList = keys %TradfriDevice_gets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
-	}
-	
-	if($opt eq 'deviceInfo'){
-		# my $jsonText = IOWrite($hash, 'get', PATH_DEVICE_ROOT . "/" . $hash->{deviceAddress}, '');
-
-		# if(!defined($jsonText)){
-		# 	return "Error while fetching device info!";
-		# }
-		
-		# #parse the JSON data
-		# my $jsonData = eval{ JSON->new->utf8->decode($jsonText) };
-		# if($@){
-		# 	return $jsonText; #the string was probably not valid JSON
-		# }
-
-		# return Dumper($jsonData);
-	}
-
-	return $TradfriDevice_gets{$opt};
-}
-
-sub TradfriDevice_Set($@) {
-	my ($hash, @param) = @_;
-	
-	return '"set TradfriDevice" needs at least one argument' if (int(@param) < 2);
-
-	my $argcount = int(@param);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
-	my $value = join("", @param);
-	
-	if(!defined($TradfriDevice_sets{$opt})) {
-		my @cList = keys %TradfriDevice_sets;
-		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
-		my $dimvalueMax = 254;
-		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-
-		return "Unknown argument $opt, choose one of on off dimvalue:slider,0,1,$dimvalueMax color:warm,cold,standard";
-	}
-	
-	$TradfriDevice_sets{$opt} = $value;
-
-	if($opt eq "on"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'on';
-
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::1');
-	}elsif($opt eq "off"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'off';
-
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, 'onoff::0');
-	}elsif($opt eq "dimvalue"){
-		return '"set TradfriDevice dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
-		
-		my $dimvalue = int($value);
-		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "dimvalue::$dimvalue");
-	}elsif($opt eq "color"){
-		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ($argcount < 3);
-		
-		my $rgb;
-
-		if($value eq "warm"){
-			$rgb = 'EFD275';
-		}elsif($value eq "cold"){
-			$rgb = 'F5FAF6';
-		}elsif($value eq "standard"){
-			$rgb = 'F1E0B5';
-		}else{
-			$rgb = $value;
-		}
-	
-		return IOWrite($hash, 0, 'set', $hash->{deviceAddress}, "color::$rgb");
-	}
-
-	return undef;
-}
-
-
-sub TradfriDevice_Attr(@) {
-	my ($cmd,$name,$attr_name,$attr_value) = @_;
-	if($cmd eq "set") {
-		if($attr_name eq ""){
-		}
-	}
-	return undef;
-}
 
 1;
 
@@ -331,6 +210,9 @@ sub TradfriDevice_Attr(@) {
               <li><i>dimvalue</i><br>
                   The brightness that is set for this device. It is a integer in the range of 0 to 100/ 254.<br>
                   The greatest dimvalue depends on the attribute "usePercentDimming", see below.</li>
+              <li><i>pct</i><br>
+                  The brightness that is set for this device in percent.
+              </li>
               <li><i>lastSeen</i><br>
                   A timestamp string, like "Wed, 12 Jul 2017 14:32:06 GMT". I haven't understand the mechanism behind it yet.<br>
                   Communication with the device won't update the lastSeen-timestamp - so I don't get the point of it. This needs some more investigation.</li>

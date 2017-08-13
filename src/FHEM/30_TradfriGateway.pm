@@ -79,11 +79,11 @@ sub TradfriGateway_DeviceInit($){
 
 	#subscribe to all devices and groups, update the moodlist of the group
 	#@todo check, whether we this instance is the IODev of the device/ group
-	foreach my $deviceID ( keys %{$modules{TradfriDevice}{defptr}}){
+	foreach my $deviceID ( keys %{$modules{'TradfriDevice'}{defptr}}){
 		TradfriGateway_Write($hash, 0, 'subscribe', $deviceID);
 	}
 
-	foreach my $groupID ( keys %{$modules{TradfriGroup}{defptr}}){
+	foreach my $groupID ( keys %{$modules{'TradfriGroup'}{defptr}}){
 		TradfriGateway_Write($hash, 1, 'subscribe', $groupID);
 		TradfriGateway_Write($hash, 1, 'moodlist', $groupID);
 	}
