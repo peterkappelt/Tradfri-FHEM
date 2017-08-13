@@ -105,8 +105,8 @@ sub TradfriGroup_Parse($$){
 			}
 		}
 
-		$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
-                $attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
+		$attr{$hash->{NAME}}{webCmd} = 'pct:toggle:on:off';
+                $attr{$hash->{NAME}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 		
 		#return the appropriate group's name
 		return $hash->{NAME}; 

@@ -59,7 +59,7 @@ sub TradfriDevice_Parse ($$){
 		# the path returned "Not Found" -> unknown resource, but this message still suits for this device
 		if($parts[2] eq "Not Found"){
 			$hash->{STATE} = "NotFound";
-			return $hash->{name};
+			return $hash->{NAME};
 		}
 
 		#parse the JSON data
@@ -73,7 +73,7 @@ sub TradfriDevice_Parse ($$){
 		my $dimvalue = $jsonData->{'dimvalue'} || '0';
 		my $dimpercent = int($dimvalue / 2.54 + 0.5);
 		$dimpercent = 1 if($dimvalue == 1);
-		$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+		$dimvalue = $dimpercent if (AttrVal($hash->{NAME}, 'usePercentDimming', 0) == 1);
 		my $state = 'off';
 		if($jsonData->{'onoff'} eq '0'){
 			$dimpercent = 0;
@@ -101,11 +101,11 @@ sub TradfriDevice_Parse ($$){
 		readingsBulkUpdateIfChanged($hash, 'lastSeen', $lastSeen, 1);
 		readingsEndUpdate($hash, 1);
 	
-		$attr{$hash->{name}}{webCmd} = 'pct:toggle:on:off';
-		$attr{$hash->{name}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
+		$attr{$hash->{NAME}}{webCmd} = 'pct:toggle:on:off';
+		$attr{$hash->{NAME}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{NAME}}{devStateIcon} ) );
 		
 		#return the appropriate device's name
-		return $hash->{name}; 
+		return $hash->{NAME}; 
 	}
 	
 	return undef;
