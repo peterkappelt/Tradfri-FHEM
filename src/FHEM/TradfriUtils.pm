@@ -1,6 +1,6 @@
 # @author Clemens Bergmann
 # @author Peter Kappelt  (small changes)
-# @version 1.16.dev-cf.7
+# @version 1.16.dev-cf.8
 
 package main;
 use strict;
@@ -122,7 +122,7 @@ sub Tradfri_Set($@) {
 	}elsif(($hash->{TYPE} eq 'TradfriGroup') and ($opt eq "mood")){
 		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ! @param;
 
-		if(!($value =~ /[1-9]+/)){
+		if(!($value =~ /^[0-9]+$/)){
 			#user wrote a string -> a mood name
 			if(exists($hash->{helper}{moods}->{"$value"})){
 				$value = $hash->{helper}{moods}->{"$value"}->{moodid};

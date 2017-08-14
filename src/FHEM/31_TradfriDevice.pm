@@ -1,6 +1,6 @@
 # @author Peter Kappelt
 # @author Clemens Bergmann
-# @version 1.16.dev-cf.7
+# @version 1.16.dev-cf.8
 
 package main;
 use strict;
