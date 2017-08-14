@@ -1,5 +1,6 @@
-- 3.8.2017 (1.16.dev-cf.6)
-  - feature:    get moods now working as before, please update JTradfri!
+- 3.8.2017 (1.16.dev-cf.7)
+  - feature:    smaller updates, code styling, preparation for devStateIcon
+		set for "pct"
 
 - 5.7.2017 (1.16)
   - bugfix:     31_TradfriGroup: no more warnings ("smartmatch") @ FHEM startup

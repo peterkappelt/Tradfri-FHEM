@@ -1,5 +1,6 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.6
+# @author Clemens Bergmann
+# @version 1.16.dev-cf.7
 
 package main;
 use strict;
@@ -8,27 +9,17 @@ use warnings;
 use Data::Dumper;
 use JSON;
 
-my %TradfriGroup_gets = (
-#	'groupInfo'		=> ' ',
-	'moods'			=> ' ',
-);
-
-my %TradfriGroup_sets = (
-	'on'		=> '',
-	'off'		=> '',	
-	'dimvalue'	=> '',
-	'mood'		=> '',
-);
+use TradfriUtils;
 
 sub TradfriGroup_Initialize($) {
 	my ($hash) = @_;
 
-	$hash->{DefFn}      = 'TradfriGroup_Define';
-	$hash->{UndefFn}    = 'TradfriGroup_Undef';
-	$hash->{SetFn}      = 'TradfriGroup_Set';
-	$hash->{GetFn}      = 'TradfriGroup_Get';
-	$hash->{AttrFn}     = 'TradfriGroup_Attr';
-	$hash->{ReadFn}     = 'TradfriGroup_Read';
+	$hash->{DefFn}      = 'Tradfri_Define';
+	$hash->{UndefFn}    = 'Tradfri_Undef';
+	$hash->{SetFn}      = 'Tradfri_Set';
+	$hash->{GetFn}      = 'Tradfri_Get';
+	$hash->{AttrFn}     = 'Tradfri_Attr';
+	$hash->{ReadFn}     = 'Tradfri_Read';
 	$hash->{ParseFn}	= 'TradfriGroup_Parse';
 
 	$hash->{Match} = '(^subscribedGroupUpdate::)|(^moodList::)';
@@ -38,37 +29,6 @@ sub TradfriGroup_Initialize($) {
 		. $readingFnAttributes;
 }
 
-sub TradfriGroup_Define($$) {
-	my ($hash, $def) = @_;
-	my @param = split('[ \t]+', $def);
-	
-	if(int(@param) < 3) {
-		return "too few parameters: define <name> TradfriGroup <GroupAddress>";
-	}
-   
-	$hash->{name}  = $param[0];
-	$hash->{groupAddress} = $param[2];
-
-	#reverse search, for Parse
-	$modules{TradfriGroup}{defptr}{$hash->{groupAddress}} = $hash;
-
-	AssignIoPort($hash);
-
-	#start observing the coap resource, so the module will be informed about status updates
-	#@todo stop observing, when deleting module, or stopping FHEM
-	IOWrite($hash, 1, 'subscribe', $hash->{groupAddress});
-
-	#update the moodlist
-	IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
-
-	return undef;
-}
-
-sub TradfriGroup_Undef($$) {
-	my ($hash, $arg) = @_; 
-	# nothing to do
-	return undef;
-}
 
 #messages look like this: (without newlines)
 # subscribedGroupUpdate::group-id::{
@@ -102,31 +62,45 @@ sub TradfriGroup_Parse($$){
 		return undef;
 	}
 
-	#parse the JSON data
-	my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
-	if($@){
-		return undef; #the string was probably not valid JSON
-	}
-
-	my $messageGroupID = $parts[1];
+	my $messageID = $parts[1];
 
 	#check if group with the id exists
-	if(my $hash = $modules{TradfriGroup}{defptr}{$messageGroupID}) 
+	if(my $hash = $modules{'TradfriGroup'}{defptr}{$messageID}) 
 	{
+		#parse the JSON data
+		my $jsonData = eval{ JSON->new->utf8->decode($parts[2]) };
+		if($@){
+			return undef; #the string was probably not valid JSON
+		}
+
 		if('subscribedGroupUpdate' eq $parts[0]){
-			#update of general group info
 			my $createdAt = FmtDateTimeRFC1123($jsonData->{'createdAt'} || '');
 			my $name = $jsonData->{'name'} || '';
 			my $members = JSON->new->pretty->encode($jsonData->{'members'});
+			
+			#dimvalue is in range 0 - 254
 			my $dimvalue = $jsonData->{'dimvalue'} || '0';
-			$dimvalue = int($dimvalue / 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-			my $state = ($jsonData->{'onoff'} || '0') ? 'on':'off';
+			#dimpercent is always in range 0 - 100
+			my $dimpercent = int($dimvalue / 2.54 + 0.5);
+			$dimpercent = 1 if($dimvalue == 1);
+			$dimvalue = $dimpercent if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
+			
+			my $state = 'off';
+            if($jsonData->{'onoff'} eq '0'){
+				$dimpercent = 0;
+			}else{
+               	$state = Tradfri_stateString($dimpercent);
+            }
+
+            my $onoff = ($jsonData->{'onoff'} || '0') ? 'on':'off';
 
 			readingsBeginUpdate($hash);
 			readingsBulkUpdateIfChanged($hash, 'createdAt', $createdAt, 1);
 			readingsBulkUpdateIfChanged($hash, 'name', $name, 1);
 			readingsBulkUpdateIfChanged($hash, 'members', $members, 1);
 			readingsBulkUpdateIfChanged($hash, 'dimvalue', $dimvalue, 1);
+			readingsBulkUpdateIfChanged($hash, 'pct', $dimpercent, 1);
+			readingsBulkUpdateIfChanged($hash, 'onoff', $onoff, 1) ;
 			readingsBulkUpdateIfChanged($hash, 'state', $state, 1);
 			readingsEndUpdate($hash, 1);
 		}elsif('moodList' eq $parts[0]){
@@ -138,103 +112,14 @@ sub TradfriGroup_Parse($$){
 				$hash->{helper}{moods}->{$_->{name}} = $_;
 			}
 		}
+
+		#$attr{$hash->{NAME}}{webCmd} = 'pct:toggle:on:off';
+        #$attr{$hash->{NAME}}{devStateIcon} = '{(Tradfri_devStateIcon($name),"toggle")}' if( !defined( $attr{$hash->{name}}{devStateIcon} ) );
 		
 		#return the appropriate group's name
 		return $hash->{NAME}; 
 	}
 
-	return undef;
-}
-
-sub TradfriGroup_Get($@) {
-	my ($hash, @param) = @_;
-	
-	return '"get TradfriGroup" needs at least one argument' if (int(@param) < 2);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
-	if(!$TradfriGroup_gets{$opt}) {
-		my @cList = keys %TradfriGroup_gets;
-		return "Unknown argument $opt, choose one of " . join(" ", @cList);
-	}
-	
-	if($opt eq 'moods'){
-		IOWrite($hash, 1, 'moodlist', $hash->{groupAddress});
-	}
-
-	return $TradfriGroup_gets{$opt};
-}
-
-sub TradfriGroup_Set($@) {
-	my ($hash, @param) = @_;
-	
-	return '"set TradfriGroup" needs at least one argument' if (int(@param) < 2);
-
-	my $argcount = int(@param);
-	
-	my $name = shift @param;
-	my $opt = shift @param;
-	my $value = join("", @param);
-	
-	if(!defined($TradfriGroup_sets{$opt})) {
-		my @cList = keys %TradfriGroup_sets;
-		#return "Unknown argument $opt, choose one of " . join(" ", @cList);
-
-		#dynamic option: max dimvalue
-		my $dimvalueMax = 254;
-		$dimvalueMax = 100 if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-
-		#dynamic option: moods
-		my $moodsList = join(",", map { "$_" } keys %{$hash->{helper}{moods}});
-
-		return "Unknown argument $opt, choose one of dimvalue:slider,0,1,$dimvalueMax off on mood:$moodsList";
-	}
-	
-	$TradfriGroup_sets{$opt} = $value;
-
-	if($opt eq "on"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'on';
-		
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, 'onoff::1');
-	}elsif($opt eq "off"){
-		#@todo state shouldn't be updated here?!
-		$hash->{STATE} = 'off';
-		
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, 'onoff::0');
-	}elsif($opt eq "dimvalue"){
-		return '"set TradfriGroup dimvalue" requires a brightness-value between 0 and 254!'  if ($argcount < 3);
-
-		my $dimvalue = int($value);
-		$dimvalue = int($value * 2.54 + 0.5) if (AttrVal($hash->{name}, 'usePercentDimming', 0) == 1);
-
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "dimvalue::$dimvalue");
-	}elsif($opt eq "mood"){
-		return '"set TradfriGroup mood" requires a mood ID or a mood name. You can list the available moods for this group by running "get moods"'  if ($argcount < 3);
-
-		if(!($value =~ /[1-9]+/)){
-		 	#user wrote a string -> a mood name
-		 	if(exists($hash->{helper}{moods}->{"$value"})){
-		 		$value = $hash->{helper}{moods}->{"$value"}->{moodid};
-		 	}else{
-	 			return "Unknown mood!";
-		 	}
-		}
-
-		return IOWrite($hash, 1, 'set', $hash->{groupAddress}, "mood::$value");
-	}
-
-	return undef;
-}
-
-
-sub TradfriGroup_Attr(@) {
-	my ($cmd,$name,$attr_name,$attr_value) = @_;
-	if($cmd eq "set") {
-		if($attr_name eq ""){
-
-		}
-	}
 	return undef;
 }
 
@@ -331,6 +216,8 @@ sub TradfriGroup_Attr(@) {
               <li><i>dimvalue</i><br>
                   The brightness that is set for this group. It is a integer in the range of 0 to 100/ 254.<br>
                   The greatest dimvalue depends on the attribute "usePercentDimming", see below.</li>
+              <li><i>pct</i><br>
+                  The brightness that is set for this device in percent.</li>
               <li><i>members</i><br>
                   JSON-String that contains all member-IDs and their names.</li>
               <li><i>moods</i><br>
@@ -339,6 +226,8 @@ sub TradfriGroup_Attr(@) {
                   This reading isn't updated automatically, you've to call "get moods" in order to refresh them.</li>    
               <li><i>name</i><br>
                   The name of the group that you've set in the app.</li>
+              <li><i>onoff</i><br>
+                  Indicates whether the device is on or off, can be the strings 'on' or 'off'</li>
               <li><i>state</i><br>
                   Indicates, whether the group is on or off. Thus, the reading's value is either "on" or "off", too.</li>
         </ul>
