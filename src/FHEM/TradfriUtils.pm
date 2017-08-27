@@ -1,6 +1,6 @@
 # @author Clemens Bergmann
 # @author Peter Kappelt  (small changes)
-# @version 1.16.dev-cf.8
+# @version 1.16.dev-cf.9
 
 package main;
 use strict;
@@ -68,7 +68,7 @@ sub Tradfri_setBrightness($$){
 	}else{
 		my $dimvalue = int($dimpercent * 2.54 + 0.5);
 		#readingsSingleUpdate($hash, "dimvalue", $dimvalue, 1);
-		return IOWrite($hash, $type, 'set', $address, "dimvalue::$dimvalue");
+		return IOWrite($hash, $type, 'set', $address, "dimvalue::${dimvalue}");
 	}
 }
 
@@ -131,7 +131,7 @@ sub Tradfri_Set($@) {
 			}
 		}
 
-		return IOWrite($hash, 1, 'set', $hash->{address}, "mood::$value");
+		return IOWrite($hash, 1, 'set', $hash->{address}, "mood::${value}");
 	}elsif(($hash->{TYPE} eq 'TradfriDevice') and ($opt eq "color")){
 		return '"set TradfriDevice color" requires RGB value in format "RRGGBB" or "warm", "cold", "standard"!'  if ! @param;
 
@@ -147,7 +147,7 @@ sub Tradfri_Set($@) {
 			$rgb = $value;
 		}
 
-		return IOWrite($hash, 0, 'set', $hash->{address}, "color::$rgb");
+		return IOWrite($hash, 0, 'set', $hash->{address}, "color::${rgb}");
 	}else{
 		return SetExtensions($hash, $cmdList, $name, $opt, @param);
 	}

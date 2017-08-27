@@ -1,5 +1,5 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.7
+# @version 1.16.dev-cf.9
 
 package main;
 use strict;
@@ -119,14 +119,14 @@ sub TradfriGateway_Write ($@){
 	if($action eq 'list'){
 		$command .= 'list';
 	}elsif($action eq 'moodlist'){
-		$command .= "moodlist::$id";
+		$command .= "moodlist::${id}";
 	}elsif($action eq 'subscribe'){
 		#silently return if connection is open.
 		#at startup, every device/ group runs subscribe. If the connection isn't open, we do it later.
 		return if($hash->{STATE} ne 'opened');
-		$command .= "subscribe::$id";
+		$command .= "subscribe::${id}";
 	}elsif($action eq 'set'){
-		$command .= "set::$id::$attrValue";
+		$command .= "set::${id}::${attrValue}";
 	}else{
 		return "Unknown command: " . $command;
 	}

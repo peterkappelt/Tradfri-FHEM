@@ -1,9 +1,5 @@
-- 14.8.2017 (1.16.dev-cf.8)
-  - bugfix:     Couldn't set modds with numbers in their name
-
-- 14.8.2017 (1.16.dev-cf.7)
-  - feature:    smaller updates, code styling, preparation for devStateIcon
-		set for "pct"
+- 27.8.2017 (1.16.dev-cf.9)
+  - bugfix:     Error messages with some Perl versions
 
 - 5.7.2017 (1.16)
   - bugfix:     31_TradfriGroup: no more warnings ("smartmatch") @ FHEM startup
