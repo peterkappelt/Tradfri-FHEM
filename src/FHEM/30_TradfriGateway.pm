@@ -1,5 +1,7 @@
 # @author Peter Kappelt
-# @version 1.16.dev-cf.9
+# @author Sebastian Keßler
+
+# @version 1.16.dev-cf.10
 
 package main;
 use strict;
