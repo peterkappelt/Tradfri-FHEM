@@ -1,13 +1,19 @@
-# FHEM Trådfri Module
+# FHEM TrÃ¥dfri Module
 
-This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
+This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA TrÃ¥dfri gateway.
 
 ## About this branch (cf-dev)
+Das ist der Beta Pfad des Moduls
 
-This branch is used to evaluate other options for CoAP clients, here Eclipse Californium. It is one step into the direction of realtime updating of the device parameters.
-You can get information about the usage of this beta version on my website: <http://electronic.kappelt.net/wordpress/ikea-tradfri-module-for-fhem-beta/>
+## Installation in FHEM
+Zuerst im OS folgendes Modul installieren.
+  sudo apt-get libjson-perl
+
+Danach im FHEM folgende kommandos absetzen
+  update add https://raw.githubusercontent.com/Saharel001/Tradfri-FHEM/dev-cf/src/controls_tradfri.txt
+  update
+  shutdown restart
 
 ## Contact me
 
 If you've a github account: please open an issue, with the appropriate description of your problem.
-You may send me an email, though issues are prefered: <kappelt.peter@gmail.com>
