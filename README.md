@@ -1,3 +1,4 @@
+
 # FHEM Trådfri Module
 
 This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
@@ -7,12 +8,16 @@ Das ist der Beta Pfad des Moduls
 
 ## Installation in FHEM
 Zuerst im OS folgendes Modul installieren.
-  sudo apt-get libjson-perl
+```
+sudo apt-get libjson-perl
+```
 
 Danach im FHEM folgende kommandos absetzen
-  update add https://raw.githubusercontent.com/Saharel001/Tradfri-FHEM/dev-cf/src/controls_tradfri.txt
-  update
-  shutdown restart
+```
+update add https://raw.githubusercontent.com/Saharel001/Tradfri-FHEM/dev-cf/src/controls_tradfri.txt
+update
+shutdown restart
+```
 
 ## Contact me
 
