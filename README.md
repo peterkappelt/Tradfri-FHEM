@@ -1,6 +1,9 @@
-# FHEM Trådfri Module
+# FHEM TrÃ¥dfri Module
 
-This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA Trådfri gateway.
+This is a small extension module for the FHEM Home-Control software. It enables connectivity to an IKEA TrÃ¥dfri gateway.
+
+## Important Notice
+Sadly, I'm not using the Tradfri devices anymore, thus I had to stop continuing to develop on this module. I'd be happy to transfer it to a new owner.
 
 ## About this branch (cf-dev)
 
